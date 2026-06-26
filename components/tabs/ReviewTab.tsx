@@ -44,6 +44,8 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
     saveReviewPlanState,
   } = ledger
   const hasData = transactions.length > 0
+  const budgetRate = reviewPlan ? Math.min(100, Math.round(((reviewPlan.budgetDone ?? 0) / Math.max(1, reviewPlan.budgetTarget)) * 100)) : 0
+  const savingsRate = reviewPlan ? Math.min(100, Math.round(((reviewPlan.savingsDone ?? 0) / Math.max(1, reviewPlan.savingsTarget)) * 100)) : 0
 
   return (
     <section className="page active">
@@ -83,7 +85,7 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
           <div className="tip-card" style={{ marginBottom: 12 }}>
             <span className="tip-ico">✓</span>
             <span>
-              已加载上月计划：预算 {yuan(reviewPlan.budgetTarget)}，存钱 {yuan(reviewPlan.savingsTarget)}
+              已加载上月计划：预算 {yuan(reviewPlan.budgetTarget)}，存钱 {yuan(reviewPlan.savingsTarget)} · 完成率 {budgetRate}% / {savingsRate}%
             </span>
           </div>
         ) : (

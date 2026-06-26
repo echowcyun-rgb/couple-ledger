@@ -17,7 +17,9 @@
     } catch {}
   }
 
-  const buildTx = ({ amount, date, note }) => ({
+  const normalizeText = (value) => String(value || "").toLowerCase()
+
+  const buildTx = ({ amount, date, note, status }) => ({
     id: `tx_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
     date,
     type: "in",
@@ -25,6 +27,7 @@
     categoryKey: "salary",
     memberId: "wu",
     note,
+    status,
     createdAt: Date.now(),
   })
 
@@ -41,15 +44,20 @@
     }
   }
 
-  const handlePayload = ({ amount, date, source }) => {
+  const handlePayload = ({ amount, date, keyword = "", source }) => {
     const num = Number(amount)
     if (!date || !Number.isFinite(num) || num <= 0) return
     const key = `${date}|${num}`
     const seen = readJSON(STORAGE_KEY, {})
     if (seen[key]) return
 
-    const note = source === "autoIncome" ? "自动入账待确认" : "待确认"
-    const tx = buildTx({ amount: num, date, note })
+    const text = normalizeText(keyword)
+    if (text && !KEYWORDS.some((k) => text.includes(k))) return
+
+    const today = new Date().toISOString().slice(0, 10)
+    const status = date === today ? "confirmed" : "pending"
+    const note = status === "pending" ? "待确认" : "工资入账"
+    const tx = buildTx({ amount: num, date, note, status })
     if (!syncToLedger(tx)) return
     seen[key] = true
     writeJSON(STORAGE_KEY, seen)
@@ -57,15 +65,18 @@
 
   const params = new URLSearchParams(location.search)
   if (params.get("action") === "autoIncome") {
-    const amount = params.get("amount")
-    const date = params.get("date") || new Date().toISOString().slice(0, 10)
-    const text = [params.get("keyword"), params.get("desc"), params.get("note")].filter(Boolean).join(" ")
-    const matched = !text || KEYWORDS.some((k) => text.includes(k))
-    if (matched) handlePayload({ amount, date, source: "autoIncome" })
+    handlePayload({
+      amount: params.get("amount"),
+      date: params.get("date") || new Date().toISOString().slice(0, 10),
+      keyword: [params.get("keyword"), params.get("desc"), params.get("note")].filter(Boolean).join(" "),
+      source: "query",
+    })
   }
 
   window.addEventListener("message", (event) => {
     const data = event.data || {}
-    if (data.type === "AUTO_INCOME") handlePayload({ amount: data.amount, date: data.date, source: "postMessage" })
+    if (data.type === "AUTO_INCOME") {
+      handlePayload({ amount: data.amount, date: data.date, keyword: data.keyword, source: "postMessage" })
+    }
   })
 })()

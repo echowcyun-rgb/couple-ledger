@@ -155,7 +155,11 @@ export function useLedger() {
     [transactions, cats, reviewYear, reviewMonth]
   )
 
-  const reviewPlanKey = currentPlanKey(reviewYear, reviewMonth)
+  const reviewPlanKey = useMemo(() => {
+    const prevMonth = reviewMonth === 1 ? 12 : reviewMonth - 1
+    const prevYear = reviewMonth === 1 ? reviewYear - 1 : reviewYear
+    return currentPlanKey(prevYear, prevMonth)
+  }, [reviewYear, reviewMonth])
   const reviewPlan = useMemo(() => loadReviewPlan(reviewPlanKey), [reviewPlanKey])
 
   const toast = useCallback((msg: string) => {
@@ -430,9 +434,11 @@ export function useLedger() {
       monthKey: currentPlanKey(nextYear, nextMonth),
       budgetTarget: budget,
       savingsTarget: savings,
+      budgetDone: reviewSummary.expense,
+      savingsDone: reviewSummary.savings,
     })
     toast("下月计划已保存")
-  }, [planBudgetTarget, planSavingsTarget, reviewMonth, reviewYear, toast])
+  }, [planBudgetTarget, planSavingsTarget, reviewMonth, reviewYear, reviewSummary.expense, reviewSummary.savings, toast])
 
   return {
     hydrated,

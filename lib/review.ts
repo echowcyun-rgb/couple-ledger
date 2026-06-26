@@ -1,5 +1,4 @@
 import type { Category, ReviewHabitAnalysis, ReviewPlan, Transaction } from "./types"
-import { REVIEW_INSIGHT_RULES } from "./constants"
 import { yuan } from "./format"
 
 const YEAR_MONTH = /^\d{4}-\d{2}$/

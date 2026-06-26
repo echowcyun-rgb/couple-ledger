@@ -44,6 +44,7 @@ export interface Transaction {
   categoryKey: string
   memberId: string
   note: string
+  status?: "confirmed" | "pending"
   createdAt: number
 }
 

@@ -104,7 +104,7 @@ export function GoalSheet({
             />
             <input
               className="ga-input ga-name"
-              placeholder="目标名称，如：看演唱会"
+              placeholder="昵称/目标名称，如：看演唱会"
               value={newGoalName}
               onChange={(e) => setNewGoalName(e.target.value.replace(/\s+/g, " ").trimStart())}
               maxLength={18}

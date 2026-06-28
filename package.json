@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3006",
-    "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 3005",
+    "build": "node node_modules/next/dist/bin/next build",
+    "start": "node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3005",
     "lint": "eslint ."
   },
   "dependencies": {

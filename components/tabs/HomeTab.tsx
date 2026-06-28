@@ -1,4 +1,3 @@
-import { getGoalContribution } from "@/lib/goals"
 import { yuan } from "@/lib/format"
 import type { Ledger } from "@/hooks/useLedger"
 
@@ -9,9 +8,7 @@ export function HomeTab({
     Ledger,
     | "members"
     | "currentMonth"
-    | "activeGoal"
-    | "pct"
-    | "barWidth"
+    | "goals"
     | "monthSummary"
     | "memberSummaries"
     | "today"
@@ -19,10 +16,8 @@ export function HomeTab({
     | "openRecord"
   >
 }) {
-  const { members, currentMonth, activeGoal, pct, barWidth, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
+  const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
   const now = new Date()
-  const m0 = members[0]
-  const m1 = members[1]
 
   return (
     <section className="page active">
@@ -48,39 +43,39 @@ export function HomeTab({
             <div className="battle-title">★ 存钱大作战</div>
             <button className="px-btn ghost sm" onClick={() => setGoalOpen(true)}>管理目标</button>
           </div>
-          {activeGoal ? (
-            <>
-              <div className="quest">{activeGoal.name} {activeGoal.emoji}</div>
-              <div className="battle-amount">
-                <span className="cur">¥{activeGoal.current.toLocaleString()}</span>
-                <span className="tgt">目标 ¥{activeGoal.target.toLocaleString()}</span>
-              </div>
-              <div className="hpbar">
-                <div className="hpfill" style={{ width: `${barWidth}%` }} />
-              </div>
-              <div className="eta">♥ 已完成 {pct}%，还差 ¥{(activeGoal.target - activeGoal.current).toLocaleString()} 就达成啦</div>
-              <div className="players">
-                {m0 && (
-                  <div className="player">
-                    <img className="pixavatar sm a" src={m0.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
-                    <div className="pmeta">
-                      <div className="pname">{m0.name}</div>
-                      <div className="pval">¥{getGoalContribution(activeGoal, m0.id).toLocaleString()}</div>
+          {goals.length > 0 ? (
+            <div className="goal-cards">
+              {goals
+                .sort((a, b) => {
+                  if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline)
+                  if (a.deadline) return -1
+                  if (b.deadline) return 1
+                  return 0
+                })
+                .slice(0, 3)
+                .map((g) => {
+                  const gp = Math.min(100, Math.round((g.current / g.target) * 100))
+                  const daysLeft = g.deadline
+                    ? Math.max(0, Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                    : null
+                  return (
+                    <div className="goal-card" key={g.id}>
+                      <div className="goal-card-head">
+                        <span className="goal-card-emoji">{g.emoji}</span>
+                        <span className="goal-card-name">{g.name}</span>
+                        {daysLeft !== null && (
+                          <span className="goal-card-days">{daysLeft === 0 ? "今天截止！" : `还剩 ${daysLeft} 天`}</span>
+                        )}
+                      </div>
+                      <div className="hpbar"><div className="hpfill" style={{ width: `${gp}%` }} /></div>
+                      <div className="goal-card-amt">
+                        <span className="cur">¥{g.current.toLocaleString()}</span>
+                        <span className="tgt">/ ¥{g.target.toLocaleString()}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-                <div className="vs">VS</div>
-                {m1 && (
-                  <div className="player right">
-                    <div className="pmeta">
-                      <div className="pname">{m1.name}</div>
-                      <div className="pval">¥{getGoalContribution(activeGoal, m1.id).toLocaleString()}</div>
-                    </div>
-                    <img className="pixavatar sm b" src={m1.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
-                  </div>
-                )}
-              </div>
-            </>
+                  )
+                })}
+            </div>
           ) : (
             <div className="no-goal">
               <div className="no-goal-txt">还没有存钱目标</div>

@@ -54,6 +54,7 @@ export function useLedger() {
   const [newGoalName, setNewGoalName] = useState("")
   const [newGoalTarget, setNewGoalTarget] = useState("")
   const [newGoalEmoji, setNewGoalEmoji] = useState("★")
+  const [newGoalDeadline, setNewGoalDeadline] = useState("")
   const [updateGoalId, setUpdateGoalId] = useState<number | null>(null)
   const [updateMode, setUpdateMode] = useState<"amount" | "pct">("amount")
   const [updateAmount, setUpdateAmount] = useState("")
@@ -344,7 +345,16 @@ export function useLedger() {
     if (!name) { toast("请填写目标名称"); return }
     if (isNaN(target) || target <= 0) { toast("请填写有效的目标金额"); return }
     const id = Date.now()
-    const goal: Goal = { id, name, emoji: newGoalEmoji || "★", current: 0, target, contributions: {}, history: [] }
+    const goal: Goal = {
+      id,
+      name,
+      emoji: newGoalEmoji || "★",
+      current: 0,
+      target,
+      contributions: {},
+      history: [],
+      deadline: newGoalDeadline,
+    }
     setState((s) => ({
       ...s,
       goals: [...s.goals, goal],
@@ -352,9 +362,10 @@ export function useLedger() {
     }))
     setNewGoalName("")
     setNewGoalTarget("")
+    setNewGoalDeadline("")
     setNewGoalEmoji("★")
     toast(`已新增目标「${name}」`)
-  }, [newGoalName, newGoalTarget, newGoalEmoji, toast])
+  }, [newGoalName, newGoalTarget, newGoalEmoji, newGoalDeadline, toast])
 
   const removeGoal = useCallback((id: number) => {
     setState((s) => {
@@ -650,6 +661,8 @@ export function useLedger() {
     setNewGoalName,
     newGoalTarget,
     setNewGoalTarget,
+    newGoalDeadline,
+    setNewGoalDeadline,
     newGoalEmoji,
     setNewGoalEmoji,
     updateGoalId,

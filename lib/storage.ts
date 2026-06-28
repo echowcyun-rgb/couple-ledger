@@ -26,6 +26,7 @@ function migrateGoal(g: StoredGoal): Goal {
       note: h.note,
       memberId: h.memberId,
     })),
+    deadline: g.deadline || "",
   }
 }
 
@@ -161,6 +162,7 @@ async function pushToCloud(state: AppState): Promise<void> {
         target: g.target,
         contributions: g.contributions,
         history: g.history,
+        deadline: g.deadline || "",
       },
       { onConflict: "id" }
     )
@@ -258,6 +260,7 @@ export async function syncFromCloud(): Promise<number> {
         target: Number(r.target),
         contributions: r.contributions || {},
         history: r.history || [],
+        deadline: r.deadline || "",
       }))
 
       // 合并

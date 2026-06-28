@@ -22,6 +22,8 @@ export function GoalSheet({
     | "setNewGoalName"
     | "newGoalTarget"
     | "setNewGoalTarget"
+    | "newGoalDeadline"
+    | "setNewGoalDeadline"
     | "addGoal"
   >
 }) {
@@ -39,6 +41,8 @@ export function GoalSheet({
     setNewGoalName,
     newGoalTarget,
     setNewGoalTarget,
+    newGoalDeadline,
+    setNewGoalDeadline,
     addGoal,
   } = ledger
 
@@ -70,6 +74,7 @@ export function GoalSheet({
             onClick={() => {
               setNewGoalName("")
               setNewGoalTarget("")
+              setNewGoalDeadline("")
               setNewGoalEmoji("★")
               setTimeout(() => {
                 document.getElementById("goal-add-form")?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -136,6 +141,13 @@ export function GoalSheet({
             />
           </div>
           <input className="ga-input" inputMode="decimal" placeholder="目标金额（元），如：5000" value={newGoalTarget} onChange={(e) => setNewGoalTarget(e.target.value)} />
+          <input
+            className="ga-input"
+            type="date"
+            value={newGoalDeadline}
+            onChange={(e) => setNewGoalDeadline(e.target.value)}
+            style={{ marginTop: 8 }}
+          />
           <button className="px-btn ga-btn" disabled={adding} onClick={handleAdd}>＋ 添加目标</button>
         </div>
         <button className="px-btn ghost goal-close" onClick={() => setGoalOpen(false)}>完成</button>

@@ -42,11 +42,13 @@ export default function RoomSetup({ onDone }: Props) {
       return
     }
     // 保存到 localStorage 并通知父组件
+    localStorage.removeItem("couple-ledger-v1")
     localStorage.setItem("couple-room-id", code)
     onDone(code)
   }
 
   const handleStartUsing = () => {
+    localStorage.removeItem("couple-ledger-v1")
     localStorage.setItem("couple-room-id", createdRoom)
     onDone(createdRoom)
   }

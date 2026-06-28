@@ -10,6 +10,7 @@ export function RecordSheet({
     | "recType"
     | "setRecType"
     | "recAmount"
+    | "setRecAmount"
     | "recCat"
     | "setRecCat"
     | "cats"
@@ -18,7 +19,8 @@ export function RecordSheet({
     | "members"
     | "recNote"
     | "setRecNote"
-    | "tapKey"
+    | "recDate"
+    | "setRecDate"
     | "saveRecord"
     | "setCatMgmtOpen"
   >
@@ -29,6 +31,7 @@ export function RecordSheet({
     recType,
     setRecType,
     recAmount,
+    setRecAmount,
     recCat,
     setRecCat,
     cats,
@@ -37,16 +40,21 @@ export function RecordSheet({
     members,
     recNote,
     setRecNote,
-    tapKey,
+    recDate,
+    setRecDate,
     saveRecord,
     setCatMgmtOpen,
   } = ledger
+
+  const filteredCats = cats.filter((c) => c.type === recType)
 
   return (
     <>
       <div className={`sheet-mask ${recordOpen ? "show" : ""}`} onClick={() => setRecordOpen(false)} />
       <div className={`sheet ${recordOpen ? "show" : ""}`} role="dialog" aria-label="记一笔">
         <div className="sheet-grab" aria-hidden="true" />
+
+        {/* 类型按钮 */}
         <div className="rec-types">
           {([{ k: "out", label: "支出" }, { k: "in", label: "收入" }, { k: "save", label: "存钱" }] as const).map((rt) => (
             <button
@@ -62,42 +70,99 @@ export function RecordSheet({
             </button>
           ))}
         </div>
+
+        {/* 金额（大号显示） */}
         <div className="rec-amount">
           <span className="rec-yen">¥</span>
           <span className="rec-num">{recAmount}</span>
         </div>
-        <div className="rec-cats">
-          {cats.filter((c) => c.type === recType).map((c) => (
-            <button key={c.key} className={`rec-cat ${recCat === c.key ? "on" : ""}`} onClick={() => setRecCat(c.key)}>
-              <span className="rc-glyph">{c.glyph}</span>
-              {c.label}
-            </button>
-          ))}
-          <button className="rec-cat add-cat-btn" onClick={() => { setRecordOpen(false); setCatMgmtOpen(true) }}>
-            <span className="rc-glyph">+</span>
-            自定义
-          </button>
-        </div>
+
+        {/* 经手人选择 */}
         <div className="rec-members">
-          <span className="rm-label">谁的账</span>
+          <span className="rm-label">经手人</span>
           {members.map((m) => (
-            <button key={m.id} className={`rm-pill ${recMemberId === m.id ? "on" : ""}`} onClick={() => setRecMemberId(m.id)}>
+            <button
+              key={m.id}
+              className={`rm-pill ${recMemberId === m.id ? "on" : ""}`}
+              onClick={() => setRecMemberId(m.id)}
+            >
               <img className="pixavatar xs" src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
               {m.name}
             </button>
           ))}
         </div>
-        <div className="rec-note-wrap">
-          <span className="rec-note-ico">备注</span>
-          <input className="rec-note-input" placeholder="选填，如：超市买菜" value={recNote} onChange={(e) => setRecNote(e.target.value)} maxLength={40} />
-        </div>
-        <div className="keypad">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map((k) => (
-            <button key={k} className={`key ${k === "del" ? "del" : ""}`} onClick={() => tapKey(k)}>
-              {k === "del" ? "⌫" : k}
+
+        {/* 分类下拉 */}
+        <div className="rec-field">
+          <span className="rec-field-label">分类</span>
+          <div className="rec-field-right">
+            <select
+              className="rec-select"
+              value={recCat}
+              onChange={(e) => setRecCat(e.target.value)}
+            >
+              {filteredCats.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <button className="rec-field-btn" onClick={() => { setRecordOpen(false); setCatMgmtOpen(true) }}>
+              管理
             </button>
-          ))}
+          </div>
         </div>
+
+        {/* 日期 */}
+        <div className="rec-field">
+          <span className="rec-field-label">日期</span>
+          <div className="rec-field-right">
+            <input
+              className="rec-select"
+              type="date"
+              value={recDate}
+              onChange={(e) => setRecDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* 金额输入 */}
+        <div className="rec-field">
+          <span className="rec-field-label">金额</span>
+          <div className="rec-field-right">
+            <input
+              className="rec-select rec-number-input"
+              type="number"
+              placeholder="0.00"
+              inputMode="decimal"
+              value={recAmount === "0" ? "" : recAmount}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val === "" || parseFloat(val) >= 0) {
+                  const parts = val.split(".")
+                  if (parts[1]?.length <= 2) {
+                    setRecAmount(val || "0")
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 备注 */}
+        <div className="rec-field">
+          <span className="rec-field-label">备注</span>
+          <div className="rec-field-right">
+            <input
+              className="rec-select rec-note-field"
+              placeholder="选填，如：超市买菜"
+              value={recNote}
+              onChange={(e) => setRecNote(e.target.value)}
+              maxLength={40}
+            />
+          </div>
+        </div>
+
         <button className="px-btn solid save-btn" onClick={saveRecord}>保存这一笔</button>
       </div>
     </>

@@ -22,7 +22,6 @@ export function HomeTab({
   const { members, currentMonth, activeGoal, pct, barWidth, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
   const now = new Date()
   const m0 = members[0]
-  const m1 = members[1]
 
   return (
     <section className="page active">
@@ -32,7 +31,7 @@ export function HomeTab({
           <div className="names">俩人记账本</div>
         </div>
         <div className="duo">
-          {members.slice(0, 2).map((m, i) => (
+          {members.map((m, i) => (
             <span key={m.id} className="duo-item">
               <img className="pixavatar" src={m.avatar || "/placeholder.svg"} alt={m.name} />
               {i === 0 && members.length >= 2 && <span className="duo-heart" aria-hidden="true">♥</span>}

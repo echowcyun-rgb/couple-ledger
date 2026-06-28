@@ -25,6 +25,9 @@ export function MineTab({
     | "onImportFile"
     | "avatarRef"
     | "onAvatarFile"
+    | "exportTransactionsXlsx"
+    | "setCatMgmtOpen"
+    | "cats"
   >
 }) {
   const {
@@ -46,6 +49,9 @@ export function MineTab({
     onImportFile,
     avatarRef,
     onAvatarFile,
+    exportTransactionsXlsx,
+    setCatMgmtOpen,
+    cats,
   } = ledger
 
   return (
@@ -70,7 +76,7 @@ export function MineTab({
         <div className="couple-inner couple-inner-new">
           <div className="couple-left">
             <div className="couple-avatars-new">
-              {members.slice(0, 2).map((m) => (
+              {members.map((m) => (
                 <img key={m.id} className="pixavatar couple-av" src={m.avatar || "/placeholder.svg"} alt={m.name} />
               ))}
               {members.length >= 2 && <span className="couple-heart" aria-hidden="true">♥</span>}
@@ -99,9 +105,13 @@ export function MineTab({
 
       <div className="section-title">记账设置</div>
       <div className="setlist">
-        <button className="setrow" onClick={() => toast(`发薪日：每月 ${payday} 号`)}>
+        <button className="setrow" onClick={() => setMemberPageOpen(true)}>
           <span className="set-ico s1">薪</span><span className="set-label">发薪日</span>
-          <span className="set-val">每月 {payday} 号</span><span className="set-arrow">›</span>
+          <span className="set-val">成员管理里可分别修改</span><span className="set-arrow">›</span>
+        </button>
+        <button className="setrow" onClick={() => setCatMgmtOpen(true)}>
+          <span className="set-ico s2">分</span><span className="set-label">分类管理</span>
+          <span className="set-val">{cats.length} 个</span><span className="set-arrow">›</span>
         </button>
         <button className="setrow" onClick={() => setGoalOpen(true)}>
           <span className="set-ico s3">储</span><span className="set-label">存钱目标</span>
@@ -121,7 +131,7 @@ export function MineTab({
           <span className="set-ico s5">伴</span><span className="set-label">成员管理</span>
           <span className="set-val">{members.length} 人</span><span className="set-arrow">›</span>
         </button>
-        <button className="setrow" onClick={() => toast("已导出账单 bill.xlsx")}>
+        <button className="setrow" onClick={exportTransactionsXlsx}>
           <span className="set-ico s6">出</span><span className="set-label">导出账单</span>
           <span className="set-val">.xlsx</span><span className="set-arrow">›</span>
         </button>

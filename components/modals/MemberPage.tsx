@@ -14,7 +14,6 @@ export function MemberPage({
     | "members"
     | "editAvatar"
     | "setEditAvatar"
-    | "setEditAvatar"
     | "editName"
     | "setEditName"
     | "editGender"

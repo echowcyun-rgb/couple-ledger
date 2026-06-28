@@ -4,6 +4,7 @@ import { yuan } from "@/lib/format"
 import type { Ledger } from "@/hooks/useLedger"
 
 export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
+  | "reviewYear"
   | "reviewMonth"
   | "reviewSummary"
   | "members"
@@ -24,6 +25,7 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
   | "saveReviewPlanState"
 > }) {
   const {
+    reviewYear,
     reviewMonth,
     reviewSummary,
     members,
@@ -56,7 +58,7 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
         </div>
         <div className="month-switch">
           <button className="ms-btn" onClick={prevReviewMonth}>◀</button>
-          <span className="ms-now">{reviewMonth}月</span>
+          <span className="ms-now">{reviewYear}年 {reviewMonth}月</span>
           <button className="ms-btn" onClick={nextReviewMonth}>▶</button>
         </div>
       </header>

@@ -370,6 +370,7 @@
 .app .rec-note-ico { flex: 0 0 auto; font-family: var(--font-pixel-cjk), monospace; font-size: 10px; color: var(--text-sub); white-space: nowrap; }
 .app .rec-note-input { flex: 1; border: none; background: transparent; color: var(--ink); font-family: var(--font-pixel-cjk), monospace; font-size: 12px; outline: none; }
 .app .rec-note-input::placeholder { color: var(--text-sub); }
+.app .rec-amount-input { width: 100%; padding: 10px; border: 3px solid var(--ink); border-radius: 10px; background: var(--cream); color: var(--ink); font-family: var(--font-pixel), monospace; font-size: 14px; text-align: center; }
 
 /* 自定义分类 */
 .app .cat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
@@ -384,3 +385,109 @@
 /* Toast */
 .app .toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--ink); color: var(--cream); padding: 10px 16px; border: 3px solid var(--ink); border-radius: 12px; box-shadow: 4px 4px 0 var(--accent); font-size: 11px; opacity: 0; pointer-events: none; transition: all .15s steps(3); z-index: 100; white-space: nowrap; }
 .app .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== 记账表单字段（替换汉字徽标网格） ===== */
+.app .rec-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.app .rec-field-label {
+  flex: 0 0 auto;
+  font-family: var(--font-pixel-cjk), monospace;
+  font-size: 10px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  min-width: 36px;
+}
+.app .rec-field-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app .rec-select {
+  flex: 1;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-pixel-cjk), monospace;
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  cursor: pointer;
+}
+.app .rec-field-btn {
+  flex: 0 0 auto;
+  border: 2px solid var(--ink);
+  border-radius: 7px;
+  background: var(--cream);
+  color: var(--text-sub);
+  font-family: var(--font-pixel-cjk), monospace;
+  font-size: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all .08s steps(2);
+}
+.app .rec-field-btn:active {
+  transform: translate(1px,1px);
+}
+.app .rec-number-input {
+  text-align: right;
+  font-family: var(--font-pixel), monospace;
+}
+.app .rec-note-field::placeholder {
+  color: var(--text-sub);
+}
+
+/* ===== 流水页筛选栏 ===== */
+.app .bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.app .bulk-cb {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.app .flow-item-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.app .flow-act-btn {
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  font-family: var(--font-pixel-cjk), monospace;
+  font-size: 9px;
+  padding: 4px 8px;
+  cursor: pointer;
+  background: var(--cream);
+  color: var(--ink);
+  transition: all .08s steps(2);
+}
+.app .flow-act-btn:active {
+  transform: translate(1px,1px);
+}
+.app .flow-act-btn.del {
+  color: var(--out);
+}
+.app .flow-bulk-clear {
+  background: var(--cream);
+  color: var(--text-sub);
+}
+.app .flow-bulk-delete {
+  background: var(--out);
+  color: var(--cream);
+}

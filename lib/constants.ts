@@ -56,5 +56,6 @@ export function createDefaultState(): import("./types").AppState {
     coupleBg: "",
     startDate: new Date().toISOString().slice(0, 10),
     remindOn: true,
+    importBatches: [],
   }
 }

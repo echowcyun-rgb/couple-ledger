@@ -45,7 +45,10 @@ export interface Transaction {
   memberId: string
   note: string
   status?: "confirmed" | "pending"
+  recorder?: string
   createdAt: number
+  /** Supabase 同步标记：true=已同步到云端 */
+  synced?: boolean
 }
 
 export interface FlowItem {
@@ -76,6 +79,16 @@ export interface AppState {
   coupleBg: string
   startDate: string
   remindOn: boolean
+  /** 导入批次历史，每条记录一批导入的 ID */
+  importBatches: ImportBatch[]
+}
+
+export interface ImportBatch {
+  ids: string[]
+  source: "alipay" | "wechat"
+  recorder: string
+  count: number
+  time: string
 }
 
 export interface MonthSummary {
@@ -129,12 +142,7 @@ export interface ReviewPlan {
   savingsTarget: number
   budgetDone?: number
   savingsDone?: number
-}
-
-export interface ReviewPlan {
-  budgetTarget: number
-  savingsTarget: number
-  updatedAt: string
+  updatedAt?: string
 }
 
 export interface HabitInsight {

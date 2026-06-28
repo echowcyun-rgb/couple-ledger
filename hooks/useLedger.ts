@@ -5,7 +5,7 @@ import * as XLSX from "xlsx"
 import { SYS_AVATARS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
-import { loadState, saveState } from "@/lib/storage"
+import { importSnapshot, loadState, saveState, syncFromCloud } from "@/lib/storage"
 import {
   getInTrendData,
   getExpensePie,
@@ -22,10 +22,16 @@ import {
   loadReviewPlan,
   saveReviewPlan,
 } from "@/lib/review"
+import {
+  detectSource,
+  parseAlipayCSV,
+  parseWechatCSV,
+} from "@/lib/importers"
 import type {
   AppState,
   Gender,
   Goal,
+  ImportBatch,
   Member,
   ReviewHabitAnalysis,
   ReviewPlan,
@@ -66,6 +72,7 @@ export function useLedger() {
   const [recCat, setRecCat] = useState("food")
   const [recMemberId, setRecMemberId] = useState<string>("")
   const [recNote, setRecNote] = useState("")
+  const [recDate, setRecDate] = useState(() => new Date().toISOString().slice(0, 10))
 
   const [memberPageOpen, setMemberPageOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
@@ -90,6 +97,21 @@ export function useLedger() {
     setState(loadState())
     setHydrated(true)
   }, [])
+
+  // 初始化后从云同步（用户无感）
+  useEffect(() => {
+    if (!hydrated) return
+    syncFromCloud().then((count) => {
+      if (count > 0) {
+        setState(loadState())
+        toast(`☁️ 已同步 ${count} 条云端记录`)
+      } else if (count === 0) {
+        // 没有云端数据但有云连接 → 推本地数据上去
+        const st = loadState()
+        if (st.transactions.length > 0) saveState(st)
+      }
+    })
+  }, [hydrated])
 
   useEffect(() => {
     if (hydrated) saveState(state)
@@ -194,6 +216,7 @@ export function useLedger() {
     setRecCat("food")
     setRecMemberId(members[0]?.id ?? "")
     setRecNote("")
+    setRecDate(new Date().toISOString().slice(0, 10))
     setRecordOpen(true)
   }, [members])
 
@@ -209,7 +232,7 @@ export function useLedger() {
     }
     const tx: Transaction = {
       id: `tx_${Date.now()}`,
-      date: new Date().toISOString().slice(0, 10),
+      date: recDate,
       type: recType,
       amount,
       categoryKey: recCat,
@@ -231,7 +254,38 @@ export function useLedger() {
     const label = recType === "in" ? "收入" : recType === "save" ? "存钱" : "支出"
     setRecordOpen(false)
     toast(`已记一笔${label} ¥${recAmount}`)
-  }, [recAmount, recMemberId, recType, recCat, recNote, toast])
+  }, [recAmount, recMemberId, recType, recCat, recNote, recDate, toast])
+
+  const deleteTransaction = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      transactions: s.transactions.filter((tx) => tx.id !== id),
+    }))
+    toast("已删除账单")
+  }, [toast])
+
+  const exportTransactionsXlsx = useCallback(() => {
+    const rows = transactions.map((t) => ({
+      日期: t.date,
+      类型: t.type === "out" ? "支出" : t.type === "in" ? "收入" : "存钱",
+      金额: t.amount,
+      分类: cats.find((c) => c.key === t.categoryKey)?.label || t.categoryKey,
+      经手人: members.find((m) => m.id === t.memberId)?.name || t.memberId,
+      备注: t.note || "",
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "账单")
+    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `账单_${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast("已导出账单 xlsx")
+  }, [transactions, cats, members, toast])
 
   const addGoal = useCallback(() => {
     const name = newGoalName.trim()
@@ -371,21 +425,100 @@ export function useLedger() {
   const onImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const memberId = members[0]?.id || "wu"
+
+    // .csv → 支付宝/微信账单
+    if (file.name.endsWith(".csv")) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        try {
+          const text = ev.target!.result as string
+          const source = detectSource(text)
+
+          if (source === "unknown") {
+            toast("无法识别账单来源，请确认是支付宝或微信导出的 CSV")
+            return
+          }
+
+          const result =
+            source === "alipay"
+              ? parseAlipayCSV(text, memberId)
+              : parseWechatCSV(text, memberId)
+
+          if (result.transactions.length === 0) {
+            toast(
+              result.unrecognized > 0
+                ? `解析完成，但 ${result.unrecognized} 行无法识别`
+                : "没有识别到可导入的账单记录"
+            )
+            return
+          }
+
+          const batch: ImportBatch = {
+            ...result.batch,
+            time: new Date().toISOString(),
+          }
+
+          setState((s) => ({
+            ...s,
+            transactions: [...result.transactions, ...s.transactions],
+            importBatches: [batch, ...s.importBatches],
+          }))
+          toast(
+            `✅ 已导入 ${result.transactions.length} 条${source === "alipay" ? "支付宝" : "微信"}账单`
+          )
+        } catch {
+          toast("文件解析失败，请确认是有效的 CSV 文件")
+        }
+      }
+      reader.readAsText(file)
+      e.target.value = ""
+      return
+    }
+
+    // .xlsx → 通用 Excel 导入
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
         const buf = new Uint8Array(ev.target!.result as ArrayBuffer)
         const wb = XLSX.read(buf, { type: "array" })
         const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(ws)
-        toast(`已导入 ${rows.length} 条账单`)
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws)
+        const imported = rows
+          .map((row, idx) => {
+            const date = String(row.date || row.日期 || row.时间 || "").slice(0, 10)
+            const type = String(row.type || row.类型 || "").trim() as TxType
+            const amount = Number(row.amount || row.金额 || row.数额)
+            const categoryKey = String(row.categoryKey || row.分类 || row.category || "")
+            const memberId = String(row.memberId || row.成员 || row.member || members[0]?.id || "")
+            const note = String(row.note || row.备注 || "")
+            if (!date || !["out", "in", "save"].includes(type) || !Number.isFinite(amount) || amount <= 0) return null
+            return {
+              id: `tx_import_${Date.now()}_${idx}`,
+              date,
+              type,
+              amount,
+              categoryKey: categoryKey || (type === "in" ? "salary" : type === "save" ? "save" : "food"),
+              memberId,
+              note,
+              createdAt: Date.now() + idx,
+            } as Transaction
+          })
+          .filter(Boolean) as Transaction[]
+
+        if (imported.length === 0) {
+          toast("没有识别到可导入的账单")
+          return
+        }
+        setState((s) => ({ ...s, transactions: [...imported, ...s.transactions] }))
+        toast(`✅ 已导入 ${imported.length} 条账单`)
       } catch {
         toast("文件解析失败，请检查格式")
       }
     }
     reader.readAsArrayBuffer(file)
     e.target.value = ""
-  }, [toast])
+  }, [members, toast])
 
   const prevReviewMonth = useCallback(() => {
     if (transactions.length === 0) {
@@ -491,12 +624,15 @@ export function useLedger() {
     recType,
     setRecType,
     recAmount,
+    setRecAmount,
     recCat,
     setRecCat,
     recMemberId,
     setRecMemberId,
     recNote,
     setRecNote,
+    recDate,
+    setRecDate,
     memberPageOpen,
     setMemberPageOpen,
     editingMember,
@@ -552,6 +688,8 @@ export function useLedger() {
     onAvatarFile,
     onCoupleBgFile,
     onImportFile,
+    deleteTransaction,
+    exportTransactionsXlsx,
     prevReviewMonth,
     nextReviewMonth,
     toast,

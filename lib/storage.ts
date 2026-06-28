@@ -52,6 +52,7 @@ function parseState(raw: string): AppState {
     startDate: parsed.startDate || defaults.startDate,
     remindOn: parsed.remindOn ?? true,
     importBatches: parsed.importBatches || [],
+    roomId: parsed.roomId || localStorage.getItem("couple-room-id") || "",
   }
 }
 
@@ -103,6 +104,7 @@ async function pushToCloud(state: AppState): Promise<void> {
     for (let i = 0; i < state.transactions.length; i += CHUNK) {
       const chunk = state.transactions.slice(i, i + CHUNK).map((tx) => ({
         id: tx.id,
+        room_id: state.roomId,
         date: tx.date,
         type: tx.type,
         amount: tx.amount,
@@ -125,6 +127,7 @@ async function pushToCloud(state: AppState): Promise<void> {
       const { error } = await supabase.from("members").upsert(
         {
           id: m.id,
+          room_id: state.roomId,
           name: m.name,
           avatar: m.avatar,
           gender: m.gender,
@@ -140,6 +143,7 @@ async function pushToCloud(state: AppState): Promise<void> {
       const { error } = await supabase.from("goals").upsert(
         {
           id: g.id,
+          room_id: state.roomId,
           name: g.name,
           emoji: g.emoji,
           current: g.current,
@@ -162,12 +166,14 @@ export async function syncFromCloud(): Promise<number> {
 
   let mergedCount = 0
   const local = loadState()
+  const roomId = local.roomId || localStorage.getItem("couple-room-id") || ""
 
   try {
     // 拉取交易记录
     const { data: txData, error: txErr } = await supabase
       .from("transactions")
       .select("*")
+      .eq("room_id", roomId)
       .order("created_at", { ascending: false })
 
     if (txErr) throw txErr
@@ -206,6 +212,7 @@ export async function syncFromCloud(): Promise<number> {
     const { data: memberData, error: memberErr } = await supabase
       .from("members")
       .select("*")
+      .eq("room_id", roomId)
 
     if (!memberErr && memberData && memberData.length > 0) {
       const cloudMembers: Member[] = memberData.map((r: any) => ({
@@ -228,6 +235,7 @@ export async function syncFromCloud(): Promise<number> {
     const { data: goalData, error: goalErr } = await supabase
       .from("goals")
       .select("*")
+      .eq("room_id", roomId)
 
     if (!goalErr && goalData && goalData.length > 0) {
       const cloudGoals: Goal[] = goalData.map((r: any) => ({

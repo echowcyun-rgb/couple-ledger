@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { Ledger } from "@/hooks/useLedger"
 
 export function RecordSheet({
@@ -23,6 +24,8 @@ export function RecordSheet({
     | "setRecDate"
     | "saveRecord"
     | "setCatMgmtOpen"
+    | "tapKey"
+    | "editTxId"
   >
 }) {
   const {
@@ -31,7 +34,6 @@ export function RecordSheet({
     recType,
     setRecType,
     recAmount,
-    setRecAmount,
     recCat,
     setRecCat,
     cats,
@@ -44,14 +46,25 @@ export function RecordSheet({
     setRecDate,
     saveRecord,
     setCatMgmtOpen,
+    tapKey,
+    editTxId,
   } = ledger
+
+  const [saving, setSaving] = useState(false)
+
+  function handleSave() {
+    if (saving) return
+    setSaving(true)
+    saveRecord()
+    setTimeout(() => setSaving(false), 500)
+  }
 
   const filteredCats = cats.filter((c) => c.type === recType)
 
   return (
     <>
       <div className={`sheet-mask ${recordOpen ? "show" : ""}`} onClick={() => setRecordOpen(false)} />
-      <div className={`sheet ${recordOpen ? "show" : ""}`} role="dialog" aria-label="记一笔">
+      <div className={`sheet ${recordOpen ? "show" : ""}`} role="dialog" aria-label={editTxId ? "编辑账单" : "记一笔"}>
         <div className="sheet-grab" aria-hidden="true" />
 
         {/* 类型按钮 */}
@@ -126,27 +139,18 @@ export function RecordSheet({
           </div>
         </div>
 
-        {/* 金额输入 */}
-        <div className="rec-field">
-          <span className="rec-field-label">金额</span>
-          <div className="rec-field-right">
-            <input
-              className="rec-select rec-number-input"
-              type="number"
-              placeholder="0.00"
-              inputMode="decimal"
-              value={recAmount === "0" ? "" : recAmount}
-              onChange={(e) => {
-                const val = e.target.value
-                if (val === "" || parseFloat(val) >= 0) {
-                  const parts = val.split(".")
-                  if (parts[1]?.length <= 2) {
-                    setRecAmount(val || "0")
-                  }
-                }
-              }}
-            />
-          </div>
+        {/* 数字键盘 */}
+        <div className="keypad">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`key ${k === "del" ? "del" : ""}`}
+              onClick={() => tapKey(k)}
+            >
+              {k === "del" ? "⌫" : k}
+            </button>
+          ))}
         </div>
 
         {/* 备注 */}
@@ -163,7 +167,9 @@ export function RecordSheet({
           </div>
         </div>
 
-        <button className="px-btn solid save-btn" onClick={saveRecord}>保存这一笔</button>
+        <button className="px-btn solid save-btn" disabled={saving} onClick={handleSave}>
+          {editTxId ? "保存修改" : "保存这一笔"}
+        </button>
       </div>
     </>
   )

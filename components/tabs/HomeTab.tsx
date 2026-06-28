@@ -22,6 +22,7 @@ export function HomeTab({
   const { members, currentMonth, activeGoal, pct, barWidth, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
   const now = new Date()
   const m0 = members[0]
+  const m1 = members[1]
 
   return (
     <section className="page active">

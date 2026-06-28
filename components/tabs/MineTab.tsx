@@ -105,6 +105,13 @@ export function MineTab({
 
       <div className="section-title">记账设置</div>
       <div className="setlist">
+        <div className="setrow" onClick={() => {
+          navigator.clipboard.writeText(localStorage.getItem("couple-room-id") || "")
+          toast("已复制房间号")
+        }} style={{ cursor: "pointer" }}>
+          <span className="set-ico s5">🏠</span><span className="set-label">房间号</span>
+          <span className="set-val">{localStorage.getItem("couple-room-id") || "—"}</span><span className="set-arrow">›</span>
+        </div>
         <button className="setrow" onClick={() => setMemberPageOpen(true)}>
           <span className="set-ico s1">薪</span><span className="set-label">发薪日</span>
           <span className="set-val">成员管理里可分别修改</span><span className="set-arrow">›</span>
@@ -144,7 +151,7 @@ export function MineTab({
           <span className="set-val">v1.0</span><span className="set-arrow">›</span>
         </button>
       </div>
-      <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
+      <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={onImportFile} />
       <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onAvatarFile} />
     </section>
   )

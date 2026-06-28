@@ -34,11 +34,11 @@ function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
 
 // ===== 交易记录同步 =====
 
-export async function pullTransactions(): Promise<Transaction[]> {
+export async function pullTransactions(roomId: string): Promise<Transaction[]> {
   if (!supabase) return []
   try {
     const { data, error } = await withTimeout(
-      supabase.from("transactions").select("*").order("created_at", { ascending: false }).limit(500)
+      supabase.from("transactions").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(500)
     )
     if (error) throw error
     return data || []
@@ -48,11 +48,11 @@ export async function pullTransactions(): Promise<Transaction[]> {
   }
 }
 
-export async function pushTransaction(tx: Transaction): Promise<boolean> {
+export async function pushTransaction(tx: Transaction, roomId: string): Promise<boolean> {
   if (!supabase) return false
   try {
     const { error } = await withTimeout(
-      supabase.from("transactions").upsert(tx, { onConflict: "id" })
+      supabase.from("transactions").upsert({ ...tx, room_id: roomId }, { onConflict: "id" })
     )
     if (error) throw error
     return true
@@ -62,11 +62,11 @@ export async function pushTransaction(tx: Transaction): Promise<boolean> {
   }
 }
 
-export async function pushTransactions(txns: Transaction[]): Promise<boolean> {
+export async function pushTransactions(txns: Transaction[], roomId: string): Promise<boolean> {
   if (!supabase || txns.length === 0) return false
   try {
     const { error } = await withTimeout(
-      supabase.from("transactions").upsert(txns, { onConflict: "id" })
+      supabase.from("transactions").upsert(txns.map(t => ({ ...t, room_id: roomId })), { onConflict: "id" })
     )
     if (error) throw error
     return true
@@ -76,11 +76,11 @@ export async function pushTransactions(txns: Transaction[]): Promise<boolean> {
   }
 }
 
-export async function deleteCloudTransaction(id: string): Promise<boolean> {
+export async function deleteCloudTransaction(id: string, roomId: string): Promise<boolean> {
   if (!supabase) return false
   try {
     const { error } = await withTimeout(
-      supabase.from("transactions").delete().eq("id", id)
+      supabase.from("transactions").delete().eq("id", id).eq("room_id", roomId)
     )
     if (error) throw error
     return true
@@ -92,11 +92,11 @@ export async function deleteCloudTransaction(id: string): Promise<boolean> {
 
 // ===== 存钱目标同步 =====
 
-export async function pullGoals(): Promise<Goal[]> {
+export async function pullGoals(roomId: string): Promise<Goal[]> {
   if (!supabase) return []
   try {
     const { data, error } = await withTimeout(
-      supabase.from("goals").select("*").order("id", { ascending: true })
+      supabase.from("goals").select("*").eq("room_id", roomId).order("id", { ascending: true })
     )
     if (error) throw error
     return (data || []).map((g: Record<string, unknown>) => ({
@@ -114,18 +114,19 @@ export async function pullGoals(): Promise<Goal[]> {
   }
 }
 
-export async function pushGoals(goals: Goal[]): Promise<boolean> {
+export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean> {
   if (!supabase || goals.length === 0) return false
   try {
     // 删除云端所有目标，再批量插入（简化同步逻辑）
     // 因为 Goal 有 contributions/history 这种嵌套 JSON，upsert 容易冲突
     const { error: delErr } = await withTimeout(
-      supabase.from("goals").delete().neq("id", 0)
+      supabase.from("goals").delete().eq("room_id", roomId)
     )
     if (delErr) throw delErr
 
     const rows = goals.map((g) => ({
       id: g.id,
+      room_id: roomId,
       name: g.name,
       emoji: g.emoji || "★",
       current: g.current ?? 0,
@@ -146,11 +147,11 @@ export async function pushGoals(goals: Goal[]): Promise<boolean> {
 
 // ===== 成员同步 =====
 
-export async function pullMembers(): Promise<Member[]> {
+export async function pullMembers(roomId: string): Promise<Member[]> {
   if (!supabase) return []
   try {
     const { data, error } = await withTimeout(
-      supabase.from("members").select("*")
+      supabase.from("members").select("*").eq("room_id", roomId)
     )
     if (error) throw error
     return (data || []).map((m: Record<string, unknown>) => ({
@@ -166,15 +167,15 @@ export async function pullMembers(): Promise<Member[]> {
   }
 }
 
-export async function pushMembers(members: Member[]): Promise<boolean> {
+export async function pushMembers(members: Member[], roomId: string): Promise<boolean> {
   if (!supabase || members.length === 0) return false
   try {
     const { error: delErr } = await withTimeout(
-      supabase.from("members").delete().neq("id", "")
+      supabase.from("members").delete().eq("room_id", roomId)
     )
     if (delErr) throw delErr
     const { error: insErr } = await withTimeout(
-      supabase.from("members").insert(members)
+      supabase.from("members").insert(members.map(m => ({ ...m, room_id: roomId })))
     )
     if (insErr) throw insErr
     return true
@@ -186,11 +187,11 @@ export async function pushMembers(members: Member[]): Promise<boolean> {
 
 // ===== 导入批次同步 =====
 
-export async function pullImportBatches(): Promise<ImportBatch[]> {
+export async function pullImportBatches(roomId: string): Promise<ImportBatch[]> {
   if (!supabase) return []
   try {
     const { data, error } = await withTimeout(
-      supabase.from("import_batches").select("*").order("time", { ascending: false })
+      supabase.from("import_batches").select("*").eq("room_id", roomId).order("time", { ascending: false })
     )
     if (error) throw error
     return (data || []).map((b: Record<string, unknown>) => ({
@@ -206,15 +207,16 @@ export async function pullImportBatches(): Promise<ImportBatch[]> {
   }
 }
 
-export async function pushImportBatches(batches: ImportBatch[]): Promise<boolean> {
+export async function pushImportBatches(batches: ImportBatch[], roomId: string): Promise<boolean> {
   if (!supabase || batches.length === 0) return false
   try {
     const { error: delErr } = await withTimeout(
-      supabase.from("import_batches").delete().neq("id", 0)
+      supabase.from("import_batches").delete().eq("room_id", roomId)
     )
     if (delErr) throw delErr
     const { error: insErr } = await withTimeout(
       supabase.from("import_batches").insert(batches.map((b) => ({
+        room_id: roomId,
         ids: b.ids,
         source: b.source,
         recorder: b.recorder,
@@ -230,15 +232,52 @@ export async function pushImportBatches(batches: ImportBatch[]): Promise<boolean
   }
 }
 
+// ===== 房间管理 =====
+
+/** 验证房号是否存在 */
+export async function validateRoom(roomId: string): Promise<boolean> {
+  if (!supabase) return false
+  try {
+    const { data, error } = await supabase
+      .from("couples")
+      .select("room_id")
+      .eq("room_id", roomId)
+      .maybeSingle()
+    if (error) throw error
+    return !!data
+  } catch {
+    return false
+  }
+}
+
+/** 创建新房间，返回房号 */
+export async function createRoom(): Promise<string> {
+  if (!supabase) return ""
+  // 生成4位随机数
+  const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
+  let roomId = generateCode()
+  let attempts = 0
+  while (attempts < 10) {
+    const exists = await validateRoom(roomId)
+    if (!exists) {
+      const { error } = await supabase.from("couples").insert({ room_id: roomId })
+      if (!error) return roomId
+    }
+    roomId = generateCode()
+    attempts++
+  }
+  return ""
+}
+
 // ===== 全量同步：启动时拉取云端数据合并到本地 =====
 
-export async function fullPull(): Promise<Partial<AppState>> {
+export async function fullPull(roomId: string): Promise<Partial<AppState>> {
   if (!supabase) return {}
   const [txns, goals, members, batches] = await Promise.all([
-    pullTransactions(),
-    pullGoals(),
-    pullMembers(),
-    pullImportBatches(),
+    pullTransactions(roomId),
+    pullGoals(roomId),
+    pullMembers(roomId),
+    pullImportBatches(roomId),
   ])
   return {
     transactions: txns,
@@ -250,14 +289,14 @@ export async function fullPull(): Promise<Partial<AppState>> {
 
 // ===== 全量推送：把本地状态推送到云端 =====
 
-export async function fullPush(state: AppState): Promise<boolean> {
+export async function fullPush(state: AppState, roomId: string): Promise<boolean> {
   if (!supabase) return false
   try {
     await Promise.all([
-      pushTransactions(state.transactions),
-      pushGoals(state.goals),
-      pushMembers(state.members),
-      pushImportBatches(state.importBatches),
+      pushTransactions(state.transactions, roomId),
+      pushGoals(state.goals, roomId),
+      pushMembers(state.members, roomId),
+      pushImportBatches(state.importBatches, roomId),
     ])
     return true
   } catch {

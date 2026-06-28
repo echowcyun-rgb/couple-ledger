@@ -19,13 +19,31 @@
 
   const normalizeText = (value) => String(value || "").toLowerCase()
 
+  const getMemberId = () => {
+    const params = new URLSearchParams(location.search)
+    const fromUrl = params.get("memberId")
+    if (fromUrl) return fromUrl
+    try {
+      const raw = localStorage.getItem("couple-ledger-v1")
+      if (raw) {
+        const state = JSON.parse(raw)
+        const first = state.members?.[0]?.id
+        if (first) return first
+      }
+    } catch {}
+    const fromStorage = localStorage.getItem("couple-active-member-id")
+    if (fromStorage) return fromStorage
+    const fromDom = document.querySelector("[data-member-id]")?.getAttribute("data-member-id")
+    return fromDom || "wu"
+  }
+
   const buildTx = ({ amount, date, note, status }) => ({
     id: `tx_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
     date,
     type: "in",
     amount,
     categoryKey: "salary",
-    memberId: "wu",
+    memberId: getMemberId(),
     note,
     status,
     createdAt: Date.now(),

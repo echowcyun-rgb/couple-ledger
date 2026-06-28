@@ -79,8 +79,8 @@ export interface AppState {
   coupleBg: string
   startDate: string
   remindOn: boolean
-  /** 导入批次历史，每条记录一批导入的 ID */
   importBatches: ImportBatch[]
+  roomId: string
 }
 
 export interface ImportBatch {

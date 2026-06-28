@@ -57,5 +57,6 @@ export function createDefaultState(): import("./types").AppState {
     startDate: new Date().toISOString().slice(0, 10),
     remindOn: true,
     importBatches: [],
+    roomId: "",
   }
 }

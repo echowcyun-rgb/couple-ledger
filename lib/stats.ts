@@ -92,15 +92,14 @@ export function getTrendData(
     )
   }
 
-  const labels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
-  const buckets = labels.map((k) => ({ k, txs: [] as Transaction[] }))
-  filtered
-    .filter((t) => inMonth(t, refYear, refMonth))
-    .forEach((t) => {
-      const dow = new Date(t.date + "T12:00:00").getDay()
-      buckets[dow].txs.push(t)
+  if (scope === "day") {
+    const daysInMonth = new Date(refYear, refMonth, 0).getDate()
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+      const dateStr = `${refYear}-${String(refMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      const dayTxs = filtered.filter((t) => t.date === dateStr)
+      return buildRow(String(day), dayTxs)
     })
-  return buckets.map((b) => buildRow(b.k, b.txs))
+  }
 }
 
 export function getInTrendData(

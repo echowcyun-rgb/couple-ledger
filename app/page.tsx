@@ -10,6 +10,7 @@ import { MemberPage } from "@/components/modals/MemberPage"
 import { RecordSheet } from "@/components/modals/RecordSheet"
 import RoomSetup from "@/components/modals/RoomSetup"
 import { UpdateGoalSheet } from "@/components/modals/UpdateGoalSheet"
+import { EditGoalSheet } from "@/components/modals/EditGoalSheet"
 import { FlowTab } from "@/components/tabs/FlowTab"
 import { HomeTab } from "@/components/tabs/HomeTab"
 import { MineTab } from "@/components/tabs/MineTab"
@@ -63,6 +64,7 @@ export default function Page() {
       <MemberPage ledger={ledger} />
       <GoalSheet ledger={ledger} />
       <UpdateGoalSheet ledger={ledger} />
+      <EditGoalSheet ledger={ledger} />
       <RecordSheet ledger={ledger} />
       <CategorySheet ledger={ledger} />
 

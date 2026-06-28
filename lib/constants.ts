@@ -48,7 +48,7 @@ export const REVIEW_INSIGHT_RULES = [
 export function createDefaultState(): import("./types").AppState {
   return {
     transactions: [],
-    members: [...DEFAULT_MEMBERS],
+    members: [],
     goals: [],
     activeGoalId: null,
     cats: [...INIT_CATS],

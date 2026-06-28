@@ -27,6 +27,7 @@ export interface Goal {
   contributions: Record<string, number>
   history: GoalHistoryEntry[]
   deadline: string
+  completedAt?: string
 }
 
 export interface Category {

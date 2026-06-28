@@ -1,4 +1,5 @@
-import type { ImportBatch, Transaction } from "./types"
+import * as XLSX from "xlsx"
+import type { Category, ImportBatch, Member, Transaction, TxType } from "./types"
 
 // ===== 导入结果类型 =====
 export interface ImportResult {
@@ -250,4 +251,106 @@ export function detectSource(
     return firstFew.includes("交易分类") ? "alipay" : "wechat"
   }
   return "unknown"
+}
+
+// ===== 通用 xlsx/xls 导入 =====
+
+const TYPE_MAP: Record<string, TxType> = {
+  out: "out",
+  in: "in",
+  save: "save",
+  支出: "out",
+  收入: "in",
+  存钱: "save",
+}
+
+function getCell(row: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    const val = row[key]
+    if (val != null && val !== "") return val
+  }
+  const normMap = new Map(
+    Object.entries(row).map(([k, v]) => [k.trim().toLowerCase(), v])
+  )
+  for (const key of keys) {
+    const val = normMap.get(key.trim().toLowerCase())
+    if (val != null && val !== "") return val
+  }
+  return undefined
+}
+
+function parseImportDate(raw: unknown): string {
+  if (raw == null || raw === "") return ""
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return raw.toISOString().slice(0, 10)
+  }
+  if (typeof raw === "number") {
+    const parsed = XLSX.SSF.parse_date_code(raw)
+    if (parsed) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`
+    }
+  }
+  const s = String(raw).trim()
+  const matched = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (matched) {
+    return `${matched[1]}-${matched[2].padStart(2, "0")}-${matched[3].padStart(2, "0")}`
+  }
+  return s.slice(0, 10)
+}
+
+function parseImportAmount(raw: unknown): number {
+  if (typeof raw === "number") return raw
+  return parseFloat(String(raw).replace(/,/g, "").replace(/[¥￥]/g, "").trim())
+}
+
+/** 解析通用 Excel 账单（支持本应用导出的 xlsx 及常见列名） */
+export function parseGenericXlsx(
+  buffer: ArrayBuffer,
+  members: Member[],
+  cats: Category[] = []
+): Transaction[] {
+  const wb = XLSX.read(new Uint8Array(buffer), { type: "array", cellDates: true })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  if (!ws) return []
+
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { raw: false, defval: "" })
+
+  return rows
+    .map((row, idx) => {
+      const date = parseImportDate(getCell(row, "date", "日期", "时间", "交易时间", "交易日期"))
+      const rawType = String(getCell(row, "type", "类型", "收支类型") ?? "").trim()
+      const type = TYPE_MAP[rawType] || TYPE_MAP[rawType.toLowerCase()] || ""
+      const amount = parseImportAmount(getCell(row, "amount", "金额", "数额", "交易金额"))
+
+      let categoryKey = String(getCell(row, "categoryKey", "分类", "category", "类别") ?? "").trim()
+      if (categoryKey) {
+        const byKey = cats.find((c) => c.key === categoryKey)
+        const byLabel = cats.find((c) => c.label === categoryKey)
+        if (byLabel) categoryKey = byLabel.key
+        else if (!byKey) categoryKey = ""
+      }
+
+      let memberId = String(getCell(row, "memberId", "成员", "member", "经手人") ?? "").trim()
+      if (memberId) {
+        const matched = members.find((m) => m.id === memberId || m.name === memberId)
+        memberId = matched?.id || memberId
+      } else {
+        memberId = members[0]?.id || ""
+      }
+
+      const note = String(getCell(row, "note", "备注", "说明") ?? "").trim()
+      if (!date || !type || !Number.isFinite(amount) || amount <= 0) return null
+
+      return {
+        id: `tx_import_${Date.now()}_${idx}`,
+        date,
+        type,
+        amount,
+        categoryKey: categoryKey || (type === "in" ? "salary" : type === "save" ? "save" : "food"),
+        memberId,
+        note,
+        createdAt: Date.now() + idx,
+      }
+    })
+    .filter(Boolean) as Transaction[]
 }

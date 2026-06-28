@@ -58,7 +58,7 @@ export default function RoomSetup({ onDone }: Props) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(43, 36, 64, 0.95)",
+        background: "#FBF1E2",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -73,6 +73,8 @@ export default function RoomSetup({ onDone }: Props) {
           textAlign: "center",
           border: "3px solid var(--ink, #2B2440)",
           borderRadius: 12,
+          background: "var(--card, #FFFFFF)",
+          boxShadow: "6px 6px 0 var(--ink, #2B2440)",
         }}
       >
         {mode === "choose" && (

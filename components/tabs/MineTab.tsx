@@ -112,10 +112,6 @@ export function MineTab({
           <span className="set-ico s5">🏠</span><span className="set-label">房间号</span>
           <span className="set-val">{localStorage.getItem("couple-room-id") || "—"}</span><span className="set-arrow">›</span>
         </div>
-        <button className="setrow" onClick={() => setMemberPageOpen(true)}>
-          <span className="set-ico s1">薪</span><span className="set-label">发薪日</span>
-          <span className="set-val">成员管理里可分别修改</span><span className="set-arrow">›</span>
-        </button>
         <button className="setrow" onClick={() => setCatMgmtOpen(true)}>
           <span className="set-ico s2">分</span><span className="set-label">分类管理</span>
           <span className="set-val">{cats.length} 个</span><span className="set-arrow">›</span>
@@ -149,6 +145,13 @@ export function MineTab({
         <button className="setrow" onClick={() => toast("俩人记账本 v1.0")}>
           <span className="set-ico s7">关</span><span className="set-label">关于</span>
           <span className="set-val">v1.0</span><span className="set-arrow">›</span>
+        </button>
+        <button className="setrow" onClick={() => {
+          localStorage.removeItem("couple-room-id")
+          window.location.reload()
+        }}>
+          <span className="set-ico s5" style={{ background: "var(--out)" }}>↩</span><span className="set-label">换房间</span>
+          <span className="set-val">保留数据，重新选择</span><span className="set-arrow">›</span>
         </button>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={onImportFile} />

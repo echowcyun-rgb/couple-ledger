@@ -25,6 +25,7 @@ import {
 import {
   detectSource,
   parseAlipayCSV,
+  parseGenericXlsx,
   parseWechatCSV,
 } from "@/lib/importers"
 import type {
@@ -60,6 +61,13 @@ export function useLedger() {
   const [updateAmount, setUpdateAmount] = useState("")
   const [updateNote, setUpdateNote] = useState("")
   const [updateMemberId, setUpdateMemberId] = useState("")
+
+  const [editGoalOpen, setEditGoalOpen] = useState(false)
+  const [editGoalId, setEditGoalId] = useState<number | null>(null)
+  const [editGoalEmoji, setEditGoalEmoji] = useState("")
+  const [editGoalName, setEditGoalName] = useState("")
+  const [editGoalTarget, setEditGoalTarget] = useState("")
+  const [editGoalDeadline, setEditGoalDeadline] = useState("")
 
   const [catMgmtOpen, setCatMgmtOpen] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState("")
@@ -142,11 +150,29 @@ export function useLedger() {
 
   useEffect(() => {
     if (!recMemberId && members.length > 0) setRecMemberId(members[0].id)
+    if (members.length === 0) setRecMemberId("")
   }, [members, recMemberId])
 
   const activeGoal = goals.find((g) => g.id === activeGoalId) ?? goals[0] ?? null
   const pct = activeGoal ? Math.min(100, Math.round((activeGoal.current / activeGoal.target) * 100)) : 0
   const updateGoal = goals.find((g) => g.id === updateGoalId) ?? null
+
+  const activeGoals = useMemo(() => goals.filter(g => g.current < g.target), [goals])
+  const completedGoals = useMemo(() => goals.filter(g => g.current >= g.target), [goals])
+
+  // 自动标记已完成目标
+  useEffect(() => {
+    const newlyCompleted = goals.filter(g => g.current >= g.target && !g.completedAt)
+    if (newlyCompleted.length > 0) {
+      const todayStr = new Date().toISOString().slice(0, 10)
+      setState(s => ({
+        ...s,
+        goals: s.goals.map(g =>
+          g.current >= g.target && !g.completedAt ? { ...g, completedAt: todayStr } : g
+        ),
+      }))
+    }
+  }, [goals])
 
   useEffect(() => {
     setBarWidth(0)
@@ -379,6 +405,34 @@ export function useLedger() {
     toast("已删除目标")
   }, [toast])
 
+  const openEditGoal = useCallback((id: number) => {
+    const goal = goals.find(g => g.id === id)
+    if (!goal) return
+    setEditGoalId(id)
+    setEditGoalEmoji(goal.emoji)
+    setEditGoalName(goal.name)
+    setEditGoalTarget(String(goal.target))
+    setEditGoalDeadline(goal.deadline)
+    setEditGoalOpen(true)
+  }, [goals])
+
+  const saveEditGoal = useCallback(() => {
+    if (editGoalId === null) return
+    const name = editGoalName.trim()
+    const target = parseFloat(editGoalTarget)
+    if (!name) { toast("请填写目标名称"); return }
+    if (isNaN(target) || target <= 0) { toast("请填写有效的目标金额"); return }
+    setState(s => ({
+      ...s,
+      goals: s.goals.map(g => g.id === editGoalId ? {
+        ...g, name, emoji: editGoalEmoji || "★", target, deadline: editGoalDeadline
+      } : g)
+    }))
+    setEditGoalOpen(false)
+    setEditGoalId(null)
+    toast("目标已更新")
+  }, [editGoalId, editGoalName, editGoalEmoji, editGoalTarget, editGoalDeadline, toast])
+
   const openUpdateGoal = useCallback((id: number) => {
     setUpdateGoalId(id)
     setUpdateMode("amount")
@@ -453,10 +507,11 @@ export function useLedger() {
 
   const addMember = useCallback(() => {
     const id = `m_${Date.now()}`
+    const defaultName = members.length === 0 ? "我" : `成员${members.length + 1}`
     patch({
       members: [
         ...members,
-        { id, name: `成员${members.length + 1}`, avatar: SYS_AVATARS[members.length % SYS_AVATARS.length], gender: "other", payday: 10 },
+        { id, name: defaultName, avatar: SYS_AVATARS[members.length % SYS_AVATARS.length], gender: "other", payday: 10 },
       ],
     })
     toast("已添加新成员")
@@ -540,38 +595,13 @@ export function useLedger() {
       return
     }
 
-    // .xlsx → 通用 Excel 导入
+    // .xlsx / .xls → 通用 Excel 导入
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const buf = new Uint8Array(ev.target!.result as ArrayBuffer)
-        const wb = XLSX.read(buf, { type: "array" })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws)
-        const imported = rows
-          .map((row, idx) => {
-            const date = String(row.date || row.日期 || row.时间 || "").slice(0, 10)
-            const type = String(row.type || row.类型 || "").trim() as TxType
-            const amount = Number(row.amount || row.金额 || row.数额)
-            const categoryKey = String(row.categoryKey || row.分类 || row.category || "")
-            const memberId = String(row.memberId || row.成员 || row.member || members[0]?.id || "")
-            const note = String(row.note || row.备注 || "")
-            if (!date || !["out", "in", "save"].includes(type) || !Number.isFinite(amount) || amount <= 0) return null
-            return {
-              id: `tx_import_${Date.now()}_${idx}`,
-              date,
-              type,
-              amount,
-              categoryKey: categoryKey || (type === "in" ? "salary" : type === "save" ? "save" : "food"),
-              memberId,
-              note,
-              createdAt: Date.now() + idx,
-            } as Transaction
-          })
-          .filter(Boolean) as Transaction[]
-
+        const imported = parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats)
         if (imported.length === 0) {
-          toast("没有识别到可导入的账单")
+          toast("无法识别文件中的账单数据，请确保xlsx包含 日期/类型/金额 列，类型可选值：支出/收入/存钱(out/in/save)")
           return
         }
         setState((s) => ({ ...s, transactions: [...imported, ...s.transactions] }))
@@ -582,7 +612,7 @@ export function useLedger() {
     }
     reader.readAsArrayBuffer(file)
     e.target.value = ""
-  }, [members, toast])
+  }, [members, cats, toast])
 
   const prevReviewMonth = useCallback(() => {
     if (transactions.length === 0) {
@@ -648,6 +678,8 @@ export function useLedger() {
     goals,
     activeGoalId,
     activeGoal,
+    activeGoals,
+    completedGoals,
     pct,
     cats,
     coupleBg,
@@ -676,6 +708,19 @@ export function useLedger() {
     updateMemberId,
     setUpdateMemberId,
     updateGoal,
+    editGoalOpen,
+    setEditGoalOpen,
+    editGoalId,
+    editGoalEmoji,
+    setEditGoalEmoji,
+    editGoalName,
+    setEditGoalName,
+    editGoalTarget,
+    setEditGoalTarget,
+    editGoalDeadline,
+    setEditGoalDeadline,
+    openEditGoal,
+    saveEditGoal,
     catMgmtOpen,
     setCatMgmtOpen,
     newCatLabel,

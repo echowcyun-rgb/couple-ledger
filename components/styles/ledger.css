@@ -149,10 +149,15 @@
 .app .flow-item-main { flex: 1; min-width: 0; }
 .app .flow-item-cat { font-size: 12px; margin-bottom: 4px; }
 .app .flow-item-sub { font-size: 9px; color: var(--text-sub); }
-.app .flow-item-amt { font-family: var(--font-pixel), monospace; font-size: 13px; flex: 0 0 auto; }
+.app .flow-item-amt { font-family: var(--font-pixel), monospace; font-size: 11px; flex: 0 0 auto; }
 .app .flow-item-amt.in { color: var(--in); }
 .app .flow-item-amt.out { color: var(--out); }
 .app .flow-item-amt.save { color: var(--save); }
+.app .flow-item-swipe-wrap { position: relative; overflow: hidden; }
+.app .flow-item.swiped { transform: translateX(-80px); transition: transform .15s steps(4); }
+.app .flow-item { transition: transform .15s steps(4); }
+.app .flow-swipe-del { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--out); color: var(--cream); border: none; font-family: var(--font-pixel-cjk), monospace; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
+.app .flow-swipe-del:active { opacity: .85; }
 .app .empty-hint { text-align: center; font-size: 11px; color: var(--text-sub); padding: 24px 0; }
 
 /* 复盘 */
@@ -243,7 +248,7 @@
 .app .fp-back { background: none; border: none; cursor: pointer; font-family: var(--font-pixel-cjk), monospace; font-size: 14px; color: var(--ink); }
 .app .fp-title { font-size: 14px; }
 .app .fp-action { font-family: var(--font-pixel-cjk), monospace; font-size: 12px; background: var(--accent); border: 3px solid var(--ink); border-radius: 8px; color: var(--cream); padding: 6px 10px; cursor: pointer; }
-.app .fp-body { padding: 4vw; padding-bottom: 10vh; max-height: 80vh; overflow-y: auto; flex: 1; }
+.app .fp-body { padding: 16px; padding-bottom: 10vh; max-height: 80vh; overflow-y: auto; flex: 1; }
 .app .member-list { display: flex; flex-direction: column; gap: 3vw; }
 .app .ml-item .pixavatar { width: 12vw; height: 12vw; max-width: 48px; max-height: 48px; }
 .app .ml-item { display: flex; align-items: center; gap: 12px; background: var(--card); border: 3px solid var(--ink); border-radius: 14px; padding: 14px 12px; box-shadow: 3px 3px 0 var(--ink); min-height: 72px; }
@@ -309,7 +314,13 @@
 .app .goal-actions { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
 .app .goal-act-btn { border: 3px solid var(--ink); border-radius: 8px; padding: 6px 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 10px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); }
 .app .goal-act-btn.upd { background: var(--accent); color: var(--cream); }
+.app .goal-act-btn.edit { background: var(--in); color: var(--cream); }
 .app .goal-act-btn.del { background: var(--out); color: var(--cream); }
+.app .goal-tab-seg { display: flex; gap: 6px; margin-bottom: 14px; background: var(--cream); border: 2px solid var(--ink); border-radius: 9px; padding: 3px; }
+.app .goal-tab-btn { flex: 1; border: none; background: transparent; color: var(--text-sub); font-family: var(--font-pixel-cjk), monospace; font-size: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; transition: all .1s steps(2); }
+.app .goal-tab-btn.on { background: var(--accent); color: var(--cream); }
+.app .goal-done-tag { font-family: var(--font-pixel), monospace; font-size: 7px; background: var(--in); color: var(--cream); border: 2px solid var(--ink); border-radius: 5px; padding: 2px 4px; }
+.app .goal-item.completed .goal-pick { opacity: .85; }
 .app .goal-act-btn:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
 .app .goal-empty { text-align: center; font-size: 11px; color: var(--text-sub); padding: 18px 0; }
 .app .goal-add { background: var(--card); border: 3px solid var(--ink); border-radius: 14px; padding: 14px; margin-bottom: 14px; box-shadow: 3px 3px 0 var(--ink); }
@@ -320,6 +331,8 @@
 .app .ga-input { border: 3px solid var(--ink); border-radius: 10px; background: var(--cream); color: var(--ink); font-family: var(--font-pixel-cjk), monospace; font-size: 12px; padding: 10px 12px; outline: none; width: 100%; margin-bottom: 0; }
 .app .ga-input + .ga-input, .app .ga-row + .ga-input { margin-top: 10px; }
 .app .ga-input::placeholder { color: var(--text-sub); }
+.app .ga-field-label { font-size: 11px; color: var(--text-sub); margin-bottom: 6px; margin-top: 10px; }
+.app .ga-field-hint { font-size: 9px; color: var(--text-sub); margin-top: 4px; }
 .app .ga-btn { width: 100%; margin-top: 10px; padding: 12px; font-size: 12px; background: var(--accent); color: var(--cream); border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); }
 .app .goal-close { width: 100%; padding: 12px; font-size: 12px; }
 
@@ -515,8 +528,21 @@
 .app .goal-card { background: rgba(255,255,255,.08); border: 2px solid var(--ink); border-radius: 10px; padding: 12px; }
 .app .goal-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .app .goal-card-emoji { font-size: 18px; }
-.app .goal-card-name { font-family: var(--font-pixel-cjk), monospace; font-size: 12px; color: var(--cream); flex: 1; }
+.app .goal-card-name { font-family: var(--font-pixel-cjk), monospace; font-size: 12px; color: #FFFFFF; flex: 1; }
 .app .goal-card-days { font-family: var(--font-pixel), monospace; font-size: 9px; color: var(--orange); }
-.app .goal-card-amt { font-family: var(--font-pixel), monospace; font-size: 11px; color: var(--cream); margin-top: 4px; }
-.app .goal-card-amt .cur { color: var(--accent); }
-.app .goal-card-amt .tgt { color: var(--text-sub); }
+.app .goal-card-amt { font-family: var(--font-pixel), monospace; font-size: 11px; color: #FFFFFF; margin-top: 4px; }
+.app .goal-card-amt .cur { color: #FFFFFF; }
+.app .goal-card-amt .tgt { color: rgba(255,255,255,.7); }
+.app .goal-card-hint { font-size: 9px; color: rgba(255,255,255,.75); margin-top: 2px; }
+
+/* 日历热力图 */
+.app .cal-heatmap { margin-top: 8px; }
+.app .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.app .cal-head-cell { font-family: var(--font-pixel-cjk), monospace; font-size: 8px; color: var(--text-sub); text-align: center; padding: 2px; }
+.app .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.app .cal-cell { aspect-ratio: 1; border: 2px solid var(--ink); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; min-height: 42px; transition: background .1s; }
+.app .cal-cell.empty { border-color: transparent; background: transparent; }
+.app .cal-cell.has-data { border-color: var(--ink); }
+.app .cal-cell.today { border-color: var(--accent); border-width: 3px; }
+.app .cal-day-num { font-family: var(--font-pixel), monospace; font-size: 9px; color: var(--ink); line-height: 1; }
+.app .cal-amount { font-family: var(--font-pixel), monospace; font-size: 7px; color: var(--ink); opacity: .8; line-height: 1; margin-top: 2px; }

@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS goals (
   target REAL NOT NULL,
   contributions JSONB DEFAULT '{}',
   history JSONB DEFAULT '[]',
+  deadline TEXT DEFAULT '',
   updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 CREATE INDEX IF NOT EXISTS idx_goals_room ON goals(room_id);

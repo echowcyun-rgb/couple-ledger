@@ -46,6 +46,7 @@ export function HomeTab({
           {goals.length > 0 ? (
             <div className="goal-cards">
               {goals
+                .filter(g => g.current < g.target)
                 .sort((a, b) => {
                   if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline)
                   if (a.deadline) return -1
@@ -53,13 +54,18 @@ export function HomeTab({
                   return 0
                 })
                 .slice(0, 3)
-                .map((g) => {
+                .map((g, idx) => {
                   const gp = Math.min(100, Math.round((g.current / g.target) * 100))
                   const daysLeft = g.deadline
                     ? Math.max(0, Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
                     : null
+                  const GOAL_CARD_COLORS = [
+                    'rgba(61, 174, 131, 0.35)',
+                    'rgba(96, 121, 201, 0.35)',
+                    'rgba(240, 160, 60, 0.35)',
+                  ]
                   return (
-                    <div className="goal-card" key={g.id}>
+                    <div className="goal-card" key={g.id} style={{ background: GOAL_CARD_COLORS[idx] || GOAL_CARD_COLORS[0] }}>
                       <div className="goal-card-head">
                         <span className="goal-card-emoji">{g.emoji}</span>
                         <span className="goal-card-name">{g.name}</span>
@@ -71,6 +77,9 @@ export function HomeTab({
                       <div className="goal-card-amt">
                         <span className="cur">¥{g.current.toLocaleString()}</span>
                         <span className="tgt">/ ¥{g.target.toLocaleString()}</span>
+                      </div>
+                      <div className="goal-card-hint">
+                        {gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${(g.target - g.current).toLocaleString()} · ${gp}%`}
                       </div>
                     </div>
                   )

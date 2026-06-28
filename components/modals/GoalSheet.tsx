@@ -12,9 +12,12 @@ export function GoalSheet({
     | "goalOpen"
     | "setGoalOpen"
     | "goals"
+    | "activeGoals"
+    | "completedGoals"
     | "activeGoalId"
     | "setActiveGoalId"
     | "openUpdateGoal"
+    | "openEditGoal"
     | "removeGoal"
     | "newGoalEmoji"
     | "setNewGoalEmoji"
@@ -31,9 +34,12 @@ export function GoalSheet({
     goalOpen,
     setGoalOpen,
     goals,
+    activeGoals,
+    completedGoals,
     activeGoalId,
     setActiveGoalId,
     openUpdateGoal,
+    openEditGoal,
     removeGoal,
     newGoalEmoji,
     setNewGoalEmoji,
@@ -47,6 +53,7 @@ export function GoalSheet({
   } = ledger
 
   const [adding, setAdding] = useState(false)
+  const [goalTab, setGoalTab] = useState<"active" | "completed">("active")
   const swipe = useSheetSwipe(() => setGoalOpen(false), goalOpen)
 
   function handleAdd() {
@@ -72,6 +79,7 @@ export function GoalSheet({
           <button
             className="px-btn solid sm goal-add-top"
             onClick={() => {
+              setGoalTab("active")
               setNewGoalName("")
               setNewGoalTarget("")
               setNewGoalDeadline("")
@@ -84,72 +92,122 @@ export function GoalSheet({
             + 新增
           </button>
         </div>
-        <div className="goal-list">
-          {goals.map((g) => {
-            const gp = Math.min(100, Math.round((g.current / g.target) * 100))
-            return (
-              <div className={`goal-item ${g.id === activeGoalId ? "on" : ""}`} key={g.id}>
-                <button className="goal-pick" onClick={() => setActiveGoalId(g.id)}>
+        {/* Tab 切换 */}
+        <div className="goal-tab-seg">
+          <button className={`goal-tab-btn ${goalTab === "active" ? "on" : ""}`} onClick={() => setGoalTab("active")}>
+            进行中 ({activeGoals.length})
+          </button>
+          <button className={`goal-tab-btn ${goalTab === "completed" ? "on" : ""}`} onClick={() => setGoalTab("completed")}>
+            已完成 ({completedGoals.length})
+          </button>
+        </div>
+
+        {goalTab === "active" && (
+          <div className="goal-list">
+            {activeGoals.map((g) => {
+              const gp = Math.min(100, Math.round((g.current / g.target) * 100))
+              return (
+                <div className={`goal-item ${g.id === activeGoalId ? "on" : ""}`} key={g.id}>
+                  <button className="goal-pick" onClick={() => setActiveGoalId(g.id)}>
+                    <span className="goal-emoji">{g.emoji}</span>
+                    <div className="goal-meta">
+                      <div className="goal-name">
+                        {g.name}
+                        {g.id === activeGoalId && <span className="goal-cur-tag">进行中</span>}
+                      </div>
+                      <div className="goal-progress-row">
+                        <span className="goal-cur-val">¥{g.current.toLocaleString()}</span>
+                        <span className="goal-sep">/</span>
+                        <span className="goal-tgt-val">¥{g.target.toLocaleString()}</span>
+                      </div>
+                      <div className="goal-track"><div className="goal-fill" style={{ width: `${gp}%` }} /></div>
+                      <div className="goal-sub-row">
+                        <span className="goal-pct">{gp}%</span>
+                        <span className="goal-hint">目标 ¥{g.target.toLocaleString()}，{gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${(g.target - g.current).toLocaleString()}`}</span>
+                      </div>
+                    </div>
+                  </button>
+                  <div className="goal-actions">
+                    <button className="goal-act-btn edit" onClick={() => openEditGoal(g.id)}>编辑</button>
+                    <button className="goal-act-btn upd" onClick={() => openUpdateGoal(g.id)}>更新</button>
+                    <button className="goal-act-btn del" onClick={() => removeGoal(g.id)}>删除</button>
+                  </div>
+                </div>
+              )
+            })}
+            {activeGoals.length === 0 && <div className="goal-empty">还没有目标，新增一个开始存钱吧～</div>}
+          </div>
+        )}
+
+        {goalTab === "completed" && (
+          <div className="goal-list">
+            {completedGoals.map((g) => (
+              <div className="goal-item completed" key={g.id}>
+                <div className="goal-pick" style={{ cursor: "default" }}>
                   <span className="goal-emoji">{g.emoji}</span>
                   <div className="goal-meta">
                     <div className="goal-name">
                       {g.name}
-                      {g.id === activeGoalId && <span className="goal-cur-tag">进行中</span>}
+                      <span className="goal-done-tag">✅ 已完成</span>
                     </div>
                     <div className="goal-progress-row">
                       <span className="goal-cur-val">¥{g.current.toLocaleString()}</span>
                       <span className="goal-sep">/</span>
                       <span className="goal-tgt-val">¥{g.target.toLocaleString()}</span>
                     </div>
-                    <div className="goal-track"><div className="goal-fill" style={{ width: `${gp}%` }} /></div>
-                    <div className="goal-sub-row">
-                      <span className="goal-pct">{gp}%</span>
-                      <span className="goal-hint">目标 ¥{g.target.toLocaleString()}，{gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${(g.target - g.current).toLocaleString()}`}</span>
-                    </div>
+                    {g.completedAt && (
+                      <div className="goal-sub-row">
+                        <span className="goal-hint">完成于 {g.completedAt}</span>
+                      </div>
+                    )}
                   </div>
-                </button>
+                </div>
                 <div className="goal-actions">
-                  <button className="goal-act-btn upd" onClick={() => openUpdateGoal(g.id)}>更新</button>
                   <button className="goal-act-btn del" onClick={() => removeGoal(g.id)}>删除</button>
                 </div>
               </div>
-            )
-          })}
-          {goals.length === 0 && <div className="goal-empty">还没有目标，新增一个开始存钱吧～</div>}
-        </div>
-        <div className="goal-add" id="goal-add-form">
-          <div className="ga-title">新增目标</div>
-          <div className="ga-emoji-row">
-            {GOAL_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                className={`ga-emoji-btn ${newGoalEmoji === emoji ? "on" : ""}`}
-                onClick={() => setNewGoalEmoji(emoji)}
-              >
-                {emoji}
-              </button>
             ))}
+            {completedGoals.length === 0 && <div className="goal-empty">还没有已完成的存钱项目</div>}
           </div>
-          <div className="ga-row">
+        )}
+
+        {goalTab === "active" && (
+          <div className="goal-add" id="goal-add-form">
+            <div className="ga-title">新增目标</div>
+            <div className="ga-emoji-row">
+              {GOAL_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className={`ga-emoji-btn ${newGoalEmoji === emoji ? "on" : ""}`}
+                  onClick={() => setNewGoalEmoji(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="ga-row">
+              <input
+                className="ga-input ga-name"
+                placeholder="昵称/目标名称，如：看演唱会"
+                value={newGoalName}
+                onChange={(e) => setNewGoalName(e.target.value.replace(/^\s+/, ""))}
+                maxLength={18}
+              />
+            </div>
+            <input className="ga-input" inputMode="decimal" placeholder="目标金额（元），如：5000" value={newGoalTarget} onChange={(e) => setNewGoalTarget(e.target.value)} />
+            <div className="ga-field-label">预计达成时间</div>
             <input
-              className="ga-input ga-name"
-              placeholder="昵称/目标名称，如：看演唱会"
-              value={newGoalName}
-              onChange={(e) => setNewGoalName(e.target.value.replace(/^\s+/, ""))}
-              maxLength={18}
+              className="ga-input"
+              type="date"
+              value={newGoalDeadline}
+              onChange={(e) => setNewGoalDeadline(e.target.value)}
+              style={{ marginTop: 4 }}
             />
+            {!newGoalDeadline && <div className="ga-field-hint">选择预计完成日期</div>}
+            <button className="px-btn ga-btn" disabled={adding} onClick={handleAdd}>＋ 添加目标</button>
           </div>
-          <input className="ga-input" inputMode="decimal" placeholder="目标金额（元），如：5000" value={newGoalTarget} onChange={(e) => setNewGoalTarget(e.target.value)} />
-          <input
-            className="ga-input"
-            type="date"
-            value={newGoalDeadline}
-            onChange={(e) => setNewGoalDeadline(e.target.value)}
-            style={{ marginTop: 8 }}
-          />
-          <button className="px-btn ga-btn" disabled={adding} onClick={handleAdd}>＋ 添加目标</button>
-        </div>
+        )}
         <button className="px-btn ghost goal-close" onClick={() => setGoalOpen(false)}>完成</button>
       </div>
     </>

@@ -139,6 +139,7 @@ export async function pullGoals(roomId: string): Promise<Goal[]> {
       target: g.target as number,
       contributions: (g.contributions as Record<string, number>) || {},
       history: (g.history as Goal["history"]) || [],
+      deadline: (g.deadline as string) || "",
     }))
   } catch (e) {
     console.warn("拉取云端目标失败:", e)
@@ -165,6 +166,7 @@ export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean>
       target: g.target,
       contributions: g.contributions,
       history: g.history,
+      deadline: g.deadline || "",
     }))
     const { error: insErr } = await withTimeout(
       supabase.from("goals").insert(rows)

@@ -103,9 +103,9 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
         <button className="px-btn solid sm" onClick={saveReviewPlanState}>保存下月计划</button>
       </div>
       <div className="section-title">收入趋势</div>
-      <TrendCard getData={getInTrendData} members={members} totalColor="#3DAE83" />
+      <TrendCard getData={getInTrendData} members={members} totalColor="#3DAE83" refYear={reviewYear} refMonth={reviewMonth} />
       <div className="section-title">支出趋势</div>
-      <TrendCard getData={getOutTrendData} members={members} totalColor="#D96A7E" />
+      <TrendCard getData={getOutTrendData} members={members} totalColor="#D96A7E" refYear={reviewYear} refMonth={reviewMonth} />
       <div className="section-title">支出结构</div>
       <StructureCard monthData={expensePie} yearData={getYearExpensePie()} stats={structureStats} />
       {!hasData && (

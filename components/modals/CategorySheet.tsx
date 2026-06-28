@@ -50,8 +50,6 @@ export function CategorySheet({
 
   function handleAdd() {
     if (adding) return
-    const label = newCatLabel.trim()
-    if (!label) { toast("请输入分类名称"); return }
     setAdding(true)
     addCat()
     setTimeout(() => setAdding(false), 500)

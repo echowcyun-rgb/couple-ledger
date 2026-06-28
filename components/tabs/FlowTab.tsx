@@ -1,6 +1,6 @@
 import { formatFlowDate, yuan } from "@/lib/format"
 import type { Ledger } from "@/hooks/useLedger"
-import { useState } from "react"
+import { useState, useRef } from "react"
 
 export function FlowTab({
   ledger,
@@ -19,19 +19,30 @@ export function FlowTab({
     | "openEditRecord"
   >
 }) {
-  const { currentMonth, flowMonthSummary, flowFilter, setFlowFilter, members, filteredFlow, deleteTransaction, toast, openEditRecord } = ledger
+  const { currentMonth, flowMonthSummary, flowFilter, setFlowFilter, members, filteredFlow, cats, deleteTransaction, toast, openEditRecord } = ledger
 
   // 类型筛选: "all" | "out" | "in" | "save"
   const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
+  // 分类筛选
+  const [catFilter, setCatFilter] = useState<string>("all")
 
   // 批量选中 ID
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  // 按类型过滤
+  // 左滑状态
+  const [swipedId, setSwipedId] = useState<string | null>(null)
+  const touchStartX = useRef(0)
+  const touchCurrentX = useRef(0)
+
+  // 按类型和分类过滤
   let displayItems = filteredFlow
     .map(g => ({
       ...g,
-      items: typeFilter === "all" ? g.items : g.items.filter(i => i.type === typeFilter)
+      items: g.items.filter(i => {
+        if (typeFilter !== "all" && i.type !== typeFilter) return false
+        if (catFilter !== "all" && i.cat !== catFilter) return false
+        return true
+      })
     }))
     .filter(g => g.items.length > 0)
 
@@ -58,12 +69,54 @@ export function FlowTab({
 
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return
-    if (!confirm(`确认删除选中的 ${selectedIds.size} 条记录？此操作不可撤销。`)) return
+    // 批量一次性删除
     for (const id of selectedIds) {
-      await deleteTransaction(id)
+      deleteTransaction(id)
     }
     setSelectedIds(new Set())
     toast(`已删除 ${selectedIds.size} 条`)
+  }
+
+  // 左滑触摸事件
+  function handleTouchStart(e: React.TouchEvent, id: string) {
+    // 如果正在操作批量选择checkbox区域，不触发滑动
+    touchStartX.current = e.touches[0].clientX
+    touchCurrentX.current = touchStartX.current
+    // 如果当前有其他项被滑开，先关闭
+    if (swipedId && swipedId !== id) {
+      setSwipedId(null)
+    }
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    touchCurrentX.current = e.touches[0].clientX
+  }
+
+  function handleTouchEnd(id: string) {
+    const diff = touchStartX.current - touchCurrentX.current
+    if (diff > 60) {
+      // 左滑超过阈值，显示删除按钮
+      setSwipedId(id)
+    } else if (diff < -30) {
+      // 右滑关闭
+      setSwipedId(null)
+    }
+  }
+
+  function handleSwipeDelete(id: string) {
+    deleteTransaction(id)
+    setSwipedId(null)
+  }
+
+  // 点击项目 → 编辑
+  function handleItemClick(id: string) {
+    // 如果左滑已打开，先关闭；否则进入编辑
+    if (swipedId === id) {
+      setSwipedId(null)
+      return
+    }
+    setSwipedId(null)
+    openEditRecord(id)
   }
 
   return (
@@ -87,6 +140,15 @@ export function FlowTab({
       <div className="filters">
         {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
           <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)}>{f.label}</button>
+        ))}
+      </div>
+      {/* 分类筛选 */}
+      <div className="filters">
+        <button className={`filter ${catFilter === "all" ? "on" : ""}`} onClick={() => setCatFilter("all")}>全部分类</button>
+        {cats.map(c => (
+          <button key={c.key} className={`filter ${catFilter === c.key ? "on" : ""}`} onClick={() => setCatFilter(c.key)}>
+            {c.glyph} {c.label}
+          </button>
         ))}
       </div>
       {/* 经手人筛选 */}
@@ -126,25 +188,38 @@ export function FlowTab({
                 </span>
               </div>
               {group.items.map((item) => (
-                <div className="flow-item" key={item.id}>
-                  <label style={{ marginRight: 4, flexShrink: 0, display: "flex", alignItems: "center" }}>
-                    <input type="checkbox" className="bulk-cb" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
-                  </label>
-                  <span className="flow-cat-glyph">{item.catGlyph}</span>
-                  <div className="flow-item-main">
-                    <div className="flow-item-cat">{item.catLabel}{item.note ? ` · ${item.note}` : ""}</div>
-                    <div className="flow-item-sub">{item.memberName}</div>
+                <div
+                  className="flow-item-swipe-wrap"
+                  key={item.id}
+                  onTouchStart={(e) => handleTouchStart(e, item.id)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={() => handleTouchEnd(item.id)}
+                >
+                  <div
+                    className={`flow-item ${swipedId === item.id ? "swiped" : ""}`}
+                    onClick={() => handleItemClick(item.id)}
+                  >
+                    <label style={{ marginRight: 4, flexShrink: 0, display: "flex", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" className="bulk-cb" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
+                    </label>
+                    <span className="flow-cat-glyph">{item.catGlyph}</span>
+                    <div className="flow-item-main">
+                      <div className="flow-item-cat">{item.catLabel}{item.note ? ` · ${item.note}` : ""}</div>
+                      <div className="flow-item-sub">{item.memberName}</div>
+                    </div>
+                    <span className={`flow-item-amt ${item.type}`}>
+                      {item.type === "out" ? "-" : "+"}{yuan(item.amount)}
+                    </span>
                   </div>
-                  <div className="flow-item-actions">
-                    <button className="flow-act-btn" onClick={() => openEditRecord(item.id)}>改</button>
-                    <button className="flow-act-btn del" onClick={async () => {
-                      if (!confirm(`确认删除这条记录？`)) return
-                      await deleteTransaction(item.id)
-                    }}>删</button>
-                  </div>
-                  <span className={`flow-item-amt ${item.type}`}>
-                    {item.type === "out" ? "-" : "+"}{yuan(item.amount)}
-                  </span>
+                  {/* 左滑删除按钮 */}
+                  {swipedId === item.id && (
+                    <button
+                      className="flow-swipe-del"
+                      onClick={(e) => { e.stopPropagation(); handleSwipeDelete(item.id); }}
+                    >
+                      删除
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,6 +1,7 @@
 import { SYS_AVATARS } from "@/lib/constants"
 import type { Gender } from "@/lib/types"
 import type { Ledger } from "@/hooks/useLedger"
+import { useState } from "react"
 
 export function MemberPage({
   ledger,
@@ -47,6 +48,15 @@ export function MemberPage({
     addMember,
     removeMember,
   } = ledger
+
+  const [saving, setSaving] = useState(false)
+
+  function handleSave() {
+    if (saving) return
+    setSaving(true)
+    saveEditMember()
+    setTimeout(() => setSaving(false), 500)
+  }
 
   return (
     <div className="fullpage">
@@ -106,14 +116,14 @@ export function MemberPage({
             </div>
             <div className="me-btns">
               <button className="px-btn ghost" onClick={() => setEditingMember(null)}>取消</button>
-              <button className="px-btn solid" onClick={saveEditMember}>保存</button>
+              <button className="px-btn solid" disabled={saving} onClick={handleSave}>保存</button>
             </div>
           </div>
         ) : (
           <div className="member-list">
             {members.map((m, i) => (
               <div className="ml-item" key={m.id}>
-                <img className={`pixavatar ${i === 0 ? "a" : "b"}`} src={m.avatar || "/placeholder.svg"} alt={m.name} style={{ width: 48, height: 48 }} />
+                <img className={`pixavatar ${i === 0 ? "a" : "b"}`} src={m.avatar || "/placeholder.svg"} alt={m.name} />
                 <div className="ml-info">
                   <div className="ml-name">{m.name}</div>
                   <div className="ml-sub">{m.gender === "female" ? "女" : m.gender === "male" ? "男" : "其他"} · 每月 {m.payday} 号发薪</div>

@@ -32,6 +32,38 @@ function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
   ])
 }
 
+function txToRow(tx: Transaction, roomId: string) {
+  return {
+    id: tx.id,
+    room_id: roomId,
+    date: tx.date,
+    type: tx.type,
+    amount: tx.amount,
+    category_key: tx.categoryKey,
+    member_id: tx.memberId,
+    note: tx.note || "",
+    status: tx.status || "confirmed",
+    recorder: tx.recorder || null,
+    created_at: tx.createdAt,
+  }
+}
+
+function rowToTx(r: Record<string, unknown>): Transaction {
+  return {
+    id: r.id as string,
+    date: r.date as string,
+    type: r.type as Transaction["type"],
+    amount: Number(r.amount),
+    categoryKey: r.category_key as string,
+    memberId: r.member_id as string,
+    note: (r.note as string) || "",
+    status: (r.status as Transaction["status"]) || "confirmed",
+    recorder: (r.recorder as string) || undefined,
+    createdAt: r.created_at as number,
+    synced: true,
+  }
+}
+
 // ===== 交易记录同步 =====
 
 export async function pullTransactions(roomId: string): Promise<Transaction[]> {
@@ -41,10 +73,10 @@ export async function pullTransactions(roomId: string): Promise<Transaction[]> {
       supabase.from("transactions").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(500)
     )
     if (error) throw error
-    return data || []
+    return (data || []).map((r) => rowToTx(r as Record<string, unknown>))
   } catch (e) {
     console.warn("拉取云端交易记录失败:", e)
-    return []
+    throw e
   }
 }
 
@@ -52,13 +84,13 @@ export async function pushTransaction(tx: Transaction, roomId: string): Promise<
   if (!supabase) return false
   try {
     const { error } = await withTimeout(
-      supabase.from("transactions").upsert({ ...tx, room_id: roomId }, { onConflict: "id" })
+      supabase.from("transactions").upsert(txToRow(tx, roomId), { onConflict: "id" })
     )
     if (error) throw error
     return true
   } catch (e) {
     console.warn("推送交易记录到云端失败:", e)
-    return false
+    throw e
   }
 }
 
@@ -66,13 +98,13 @@ export async function pushTransactions(txns: Transaction[], roomId: string): Pro
   if (!supabase || txns.length === 0) return false
   try {
     const { error } = await withTimeout(
-      supabase.from("transactions").upsert(txns.map(t => ({ ...t, room_id: roomId })), { onConflict: "id" })
+      supabase.from("transactions").upsert(txns.map((t) => txToRow(t, roomId)), { onConflict: "id" })
     )
     if (error) throw error
     return true
   } catch (e) {
     console.warn("批量推送交易记录失败:", e)
-    return false
+    throw e
   }
 }
 

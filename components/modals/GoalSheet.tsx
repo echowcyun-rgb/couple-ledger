@@ -1,4 +1,8 @@
+import { useState } from "react"
 import type { Ledger } from "@/hooks/useLedger"
+import { useSheetSwipe } from "@/hooks/useSheetSwipe"
+
+const GOAL_EMOJIS = ["🎯", "🏠", "🚗", "✈️", "🎓", "💰", "💍", "🌍", "📱", "💻"]
 
 export function GoalSheet({
   ledger,
@@ -38,10 +42,26 @@ export function GoalSheet({
     addGoal,
   } = ledger
 
+  const [adding, setAdding] = useState(false)
+  const swipe = useSheetSwipe(() => setGoalOpen(false), goalOpen)
+
+  function handleAdd() {
+    if (adding) return
+    setAdding(true)
+    addGoal()
+    setTimeout(() => setAdding(false), 500)
+  }
+
   return (
     <>
       <div className={`sheet-mask ${goalOpen ? "show" : ""}`} onClick={() => setGoalOpen(false)} />
-      <div className={`sheet ${goalOpen ? "show" : ""}`} role="dialog" aria-label="管理存钱目标">
+      <div
+        className={`sheet ${goalOpen ? "show" : ""}`}
+        role="dialog"
+        aria-label="管理存钱目标"
+        onTouchStart={swipe.onTouchStart}
+        onTouchEnd={swipe.onTouchEnd}
+      >
         <div className="sheet-grab" aria-hidden="true" />
         <div className="goal-mgmt-header">
           <div className="sheet-title">★ 共同存钱目标</div>
@@ -94,14 +114,19 @@ export function GoalSheet({
         </div>
         <div className="goal-add" id="goal-add-form">
           <div className="ga-title">新增目标</div>
+          <div className="ga-emoji-row">
+            {GOAL_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                className={`ga-emoji-btn ${newGoalEmoji === emoji ? "on" : ""}`}
+                onClick={() => setNewGoalEmoji(emoji)}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
           <div className="ga-row">
-            <input
-              className="ga-input ga-emoji"
-              placeholder="★"
-              value={newGoalEmoji}
-              onChange={(e) => setNewGoalEmoji(e.target.value.slice(0, 1))}
-              maxLength={2}
-            />
             <input
               className="ga-input ga-name"
               placeholder="昵称/目标名称，如：看演唱会"
@@ -111,7 +136,7 @@ export function GoalSheet({
             />
           </div>
           <input className="ga-input" inputMode="decimal" placeholder="目标金额（元），如：5000" value={newGoalTarget} onChange={(e) => setNewGoalTarget(e.target.value)} />
-          <button className="px-btn ga-btn" onClick={addGoal}>＋ 添加目标</button>
+          <button className="px-btn ga-btn" disabled={adding} onClick={handleAdd}>＋ 添加目标</button>
         </div>
         <button className="px-btn ghost goal-close" onClick={() => setGoalOpen(false)}>完成</button>
       </div>

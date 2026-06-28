@@ -58,6 +58,7 @@ export function useLedger() {
   const [updateMode, setUpdateMode] = useState<"amount" | "pct">("amount")
   const [updateAmount, setUpdateAmount] = useState("")
   const [updateNote, setUpdateNote] = useState("")
+  const [updateMemberId, setUpdateMemberId] = useState("")
 
   const [catMgmtOpen, setCatMgmtOpen] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState("")
@@ -73,6 +74,7 @@ export function useLedger() {
   const [recMemberId, setRecMemberId] = useState<string>("")
   const [recNote, setRecNote] = useState("")
   const [recDate, setRecDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [editTxId, setEditTxId] = useState<string | null>(null)
 
   const [memberPageOpen, setMemberPageOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
@@ -98,20 +100,40 @@ export function useLedger() {
     setHydrated(true)
   }, [])
 
+  const toast = useCallback((msg: string) => {
+    setToastMsg(msg)
+    setToastShow(true)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToastShow(false), 1800)
+  }, [])
+
+  useEffect(() => {
+    const onCloudError = (e: Event) => {
+      const msg = (e as CustomEvent<string>).detail
+      toast(msg || "云同步失败")
+    }
+    window.addEventListener("ledger-cloud-error", onCloudError)
+    return () => window.removeEventListener("ledger-cloud-error", onCloudError)
+  }, [toast])
+
   // 初始化后从云同步（用户无感）
   useEffect(() => {
     if (!hydrated) return
-    syncFromCloud().then((count) => {
-      if (count > 0) {
-        setState(loadState())
-        toast(`☁️ 已同步 ${count} 条云端记录`)
-      } else if (count === 0) {
-        // 没有云端数据但有云连接 → 推本地数据上去
-        const st = loadState()
-        if (st.transactions.length > 0) saveState(st)
-      }
-    })
-  }, [hydrated])
+    syncFromCloud()
+      .then((count) => {
+        if (count > 0) {
+          setState(loadState())
+          toast(`☁️ 已同步 ${count} 条云端记录`)
+        } else {
+          const st = loadState()
+          if (st.transactions.length > 0) saveState(st)
+        }
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e)
+        toast(`云同步失败：${message || "请检查网络"}`)
+      })
+  }, [hydrated, toast])
 
   useEffect(() => {
     if (hydrated) saveState(state)
@@ -184,13 +206,6 @@ export function useLedger() {
   }, [reviewYear, reviewMonth])
   const reviewPlan = useMemo(() => loadReviewPlan(reviewPlanKey), [reviewPlanKey])
 
-  const toast = useCallback((msg: string) => {
-    setToastMsg(msg)
-    setToastShow(true)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToastShow(false), 1800)
-  }, [])
-
   const patch = useCallback((partial: Partial<AppState>) => {
     setState((s) => ({ ...s, ...partial }))
   }, [])
@@ -211,6 +226,7 @@ export function useLedger() {
   }, [])
 
   const openRecord = useCallback(() => {
+    setEditTxId(null)
     setRecAmount("0")
     setRecType("out")
     setRecCat("food")
@@ -220,6 +236,19 @@ export function useLedger() {
     setRecordOpen(true)
   }, [members])
 
+  const openEditRecord = useCallback((id: string) => {
+    const tx = transactions.find((t) => t.id === id)
+    if (!tx) return
+    setEditTxId(tx.id)
+    setRecType(tx.type)
+    setRecAmount(String(tx.amount))
+    setRecCat(tx.categoryKey)
+    setRecMemberId(tx.memberId)
+    setRecNote(tx.note)
+    setRecDate(tx.date)
+    setRecordOpen(true)
+  }, [transactions])
+
   const saveRecord = useCallback(() => {
     const amount = parseFloat(recAmount)
     if (!amount || amount <= 0) {
@@ -228,6 +257,28 @@ export function useLedger() {
     }
     if (!recMemberId) {
       toast("请选择成员")
+      return
+    }
+    if (editTxId) {
+      setState((s) => ({
+        ...s,
+        transactions: s.transactions.map((t) =>
+          t.id === editTxId
+            ? {
+                ...t,
+                date: recDate,
+                type: recType,
+                amount,
+                categoryKey: recCat,
+                memberId: recMemberId,
+                note: recNote.trim(),
+              }
+            : t
+        ),
+      }))
+      setEditTxId(null)
+      setRecordOpen(false)
+      toast("已更新账单")
       return
     }
     const tx: Transaction = {
@@ -254,7 +305,7 @@ export function useLedger() {
     const label = recType === "in" ? "收入" : recType === "save" ? "存钱" : "支出"
     setRecordOpen(false)
     toast(`已记一笔${label} ¥${recAmount}`)
-  }, [recAmount, recMemberId, recType, recCat, recNote, recDate, toast])
+  }, [recAmount, recMemberId, recType, recCat, recNote, recDate, editTxId, toast])
 
   const deleteTransaction = useCallback((id: string) => {
     setState((s) => ({
@@ -322,12 +373,14 @@ export function useLedger() {
     setUpdateMode("amount")
     setUpdateAmount("")
     setUpdateNote("")
-  }, [])
+    setUpdateMemberId(members[0]?.id ?? "")
+  }, [members])
 
   const saveUpdateGoal = useCallback(() => {
     if (!updateGoal || updateGoalId === null) return
     const num = Number(updateAmount)
     if (!num || num < 0) { toast("请输入有效金额"); return }
+    if (!updateMemberId) { toast("请选择经手人"); return }
     let newCurrent = num
     if (updateMode === "pct") {
       newCurrent = Math.round(updateGoal.target * (num / 100))
@@ -340,14 +393,14 @@ export function useLedger() {
           ? {
               ...x,
               current: newCurrent,
-              history: [{ date: todayStr, amount: newCurrent, note: updateNote || "手动更新" }, ...x.history].slice(0, 20),
+              history: [{ date: todayStr, amount: newCurrent, note: updateNote || "手动更新", memberId: updateMemberId }, ...x.history].slice(0, 20),
             }
           : x
       ),
     }))
     setUpdateGoalId(null)
     toast("进度已更新")
-  }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, toast])
+  }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, updateMemberId, toast])
 
   const addCat = useCallback(() => {
     const label = newCatLabel.trim()
@@ -607,6 +660,8 @@ export function useLedger() {
     setUpdateAmount,
     updateNote,
     setUpdateNote,
+    updateMemberId,
+    setUpdateMemberId,
     updateGoal,
     catMgmtOpen,
     setCatMgmtOpen,
@@ -633,6 +688,7 @@ export function useLedger() {
     setRecNote,
     recDate,
     setRecDate,
+    editTxId,
     memberPageOpen,
     setMemberPageOpen,
     editingMember,
@@ -674,6 +730,7 @@ export function useLedger() {
     switchTab,
     tapKey,
     openRecord,
+    openEditRecord,
     saveRecord,
     addGoal,
     removeGoal,

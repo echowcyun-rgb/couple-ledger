@@ -1,4 +1,6 @@
+import { useState } from "react"
 import type { Ledger } from "@/hooks/useLedger"
+import { useSheetSwipe } from "@/hooks/useSheetSwipe"
 
 export function UpdateGoalSheet({
   ledger,
@@ -14,6 +16,9 @@ export function UpdateGoalSheet({
     | "setUpdateAmount"
     | "updateNote"
     | "setUpdateNote"
+    | "updateMemberId"
+    | "setUpdateMemberId"
+    | "members"
     | "saveUpdateGoal"
   >
 }) {
@@ -27,19 +32,51 @@ export function UpdateGoalSheet({
     setUpdateAmount,
     updateNote,
     setUpdateNote,
+    updateMemberId,
+    setUpdateMemberId,
+    members,
     saveUpdateGoal,
   } = ledger
+
+  const [saving, setSaving] = useState(false)
+  const swipe = useSheetSwipe(() => setUpdateGoalId(null), updateGoalId !== null)
+
+  function handleSave() {
+    if (saving) return
+    setSaving(true)
+    saveUpdateGoal()
+    setTimeout(() => setSaving(false), 500)
+  }
 
   return (
     <>
       <div className={`sheet-mask ${updateGoalId !== null ? "show" : ""}`} onClick={() => setUpdateGoalId(null)} />
-      <div className={`sheet ${updateGoalId !== null ? "show" : ""}`} role="dialog" aria-label="更新存钱进度">
+      <div
+        className={`sheet ${updateGoalId !== null ? "show" : ""}`}
+        role="dialog"
+        aria-label="更新存钱进度"
+        onTouchStart={swipe.onTouchStart}
+        onTouchEnd={swipe.onTouchEnd}
+      >
         {updateGoal && (
           <>
             <div className="sheet-grab" aria-hidden="true" />
             <div className="sheet-title">更新「{updateGoal.name}」进度</div>
             <div className="upd-meta">
               目标 ¥{updateGoal.target.toLocaleString()} · 当前已存 ¥{updateGoal.current.toLocaleString()} · 完成 {Math.min(100, Math.round((updateGoal.current / updateGoal.target) * 100))}%
+            </div>
+            <div className="upd-field-label">经手人</div>
+            <div className="rec-members">
+              {members.map((m) => (
+                <button
+                  key={m.id}
+                  className={`rm-pill ${updateMemberId === m.id ? "on" : ""}`}
+                  onClick={() => setUpdateMemberId(m.id)}
+                >
+                  <img className="pixavatar xs" src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
+                  {m.name}
+                </button>
+              ))}
             </div>
             <div className="upd-field-label">更新方式</div>
             <div className="upd-modes">
@@ -52,7 +89,7 @@ export function UpdateGoalSheet({
             <input className="upd-input" placeholder="如：本月工资存入" value={updateNote} onChange={(e) => setUpdateNote(e.target.value)} />
             <div className="upd-btns">
               <button className="px-btn ghost" onClick={() => setUpdateGoalId(null)}>取消</button>
-              <button className="px-btn solid upd-save" onClick={saveUpdateGoal}>保存进度</button>
+              <button className="px-btn solid upd-save" disabled={saving} onClick={handleSave}>保存进度</button>
             </div>
             {updateGoal.history.length > 0 && (
               <div className="upd-history">

@@ -38,6 +38,28 @@ function mergeCats(saved: AppState["cats"]) {
   return merged
 }
 
+function emitCloudError(message: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ledger-cloud-error", { detail: message }))
+  }
+}
+
+function txToRow(tx: Transaction, roomId: string) {
+  return {
+    id: tx.id,
+    room_id: roomId,
+    date: tx.date,
+    type: tx.type,
+    amount: tx.amount,
+    category_key: tx.categoryKey,
+    member_id: tx.memberId,
+    note: tx.note || "",
+    status: tx.status || "confirmed",
+    recorder: tx.recorder || null,
+    created_at: tx.createdAt,
+  }
+}
+
 function parseState(raw: string): AppState {
   const parsed = JSON.parse(raw) as Partial<AppState> & { goals?: StoredGoal[] }
   const defaults = createDefaultState()
@@ -88,7 +110,12 @@ export function saveState(state: AppState): void {
   // 2. 异步推送到云（用户无感）
   if (useCloud) {
     if (pushTimer) clearTimeout(pushTimer)
-    pushTimer = setTimeout(() => pushToCloud(state), 1000)
+    pushTimer = setTimeout(() => {
+      pushToCloud(state).catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e)
+        emitCloudError(`云同步失败：${message || "请检查网络"}`)
+      })
+    }, 1000)
   }
 }
 
@@ -98,65 +125,46 @@ export function saveState(state: AppState): void {
 async function pushToCloud(state: AppState): Promise<void> {
   if (!supabase) return
 
-  try {
-    // 批量推送交易记录（逐条 upsert，按 id 去重）
-    const CHUNK = 50
-    for (let i = 0; i < state.transactions.length; i += CHUNK) {
-      const chunk = state.transactions.slice(i, i + CHUNK).map((tx) => ({
-        id: tx.id,
+  const CHUNK = 50
+  for (let i = 0; i < state.transactions.length; i += CHUNK) {
+    const chunk = state.transactions.slice(i, i + CHUNK).map((tx) => txToRow(tx, state.roomId))
+    const { error } = await supabase.from("transactions").upsert(chunk, {
+      onConflict: "id",
+      ignoreDuplicates: false,
+    })
+    if (error) throw new Error(error.message)
+  }
+
+  for (const m of state.members) {
+    const { error } = await supabase.from("members").upsert(
+      {
+        id: m.id,
         room_id: state.roomId,
-        date: tx.date,
-        type: tx.type,
-        amount: tx.amount,
-        category_key: tx.categoryKey,
-        member_id: tx.memberId,
-        note: tx.note || "",
-        status: tx.status || "confirmed",
-        recorder: tx.recorder || null,
-        created_at: tx.createdAt,
-      }))
-      const { error } = await supabase.from("transactions").upsert(chunk, {
-        onConflict: "id",
-        ignoreDuplicates: false,
-      })
-      if (error) console.warn("push transactions chunk failed:", error.message)
-    }
+        name: m.name,
+        avatar: m.avatar,
+        gender: m.gender,
+        payday: m.payday,
+      },
+      { onConflict: "id" }
+    )
+    if (error) throw new Error(error.message)
+  }
 
-    // 推送成员
-    for (const m of state.members) {
-      const { error } = await supabase.from("members").upsert(
-        {
-          id: m.id,
-          room_id: state.roomId,
-          name: m.name,
-          avatar: m.avatar,
-          gender: m.gender,
-          payday: m.payday,
-        },
-        { onConflict: "id" }
-      )
-      if (error) console.warn("push member failed:", error.message)
-    }
-
-    // 推送存钱目标
-    for (const g of state.goals) {
-      const { error } = await supabase.from("goals").upsert(
-        {
-          id: g.id,
-          room_id: state.roomId,
-          name: g.name,
-          emoji: g.emoji,
-          current: g.current,
-          target: g.target,
-          contributions: g.contributions,
-          history: g.history,
-        },
-        { onConflict: "id" }
-      )
-      if (error) console.warn("push goal failed:", error.message)
-    }
-  } catch (e: any) {
-    console.warn("cloud push failed:", e?.message || e)
+  for (const g of state.goals) {
+    const { error } = await supabase.from("goals").upsert(
+      {
+        id: g.id,
+        room_id: state.roomId,
+        name: g.name,
+        emoji: g.emoji,
+        current: g.current,
+        target: g.target,
+        contributions: g.contributions,
+        history: g.history,
+      },
+      { onConflict: "id" }
+    )
+    if (error) throw new Error(error.message)
   }
 }
 
@@ -214,7 +222,9 @@ export async function syncFromCloud(): Promise<number> {
       .select("*")
       .eq("room_id", roomId)
 
-    if (!memberErr && memberData && memberData.length > 0) {
+    if (memberErr) throw memberErr
+
+    if (memberData && memberData.length > 0) {
       const cloudMembers: Member[] = memberData.map((r: any) => ({
         id: r.id,
         name: r.name,
@@ -237,7 +247,9 @@ export async function syncFromCloud(): Promise<number> {
       .select("*")
       .eq("room_id", roomId)
 
-    if (!goalErr && goalData && goalData.length > 0) {
+    if (goalErr) throw goalErr
+
+    if (goalData && goalData.length > 0) {
       const cloudGoals: Goal[] = goalData.map((r: any) => ({
         id: r.id,
         name: r.name,
@@ -259,9 +271,9 @@ export async function syncFromCloud(): Promise<number> {
     // 保存合并结果
     localStorage.setItem(STORAGE_KEY, JSON.stringify(local))
     return mergedCount
-  } catch (e: any) {
-    console.warn("cloud sync failed:", e?.message || e)
-    return 0
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e)
+    throw new Error(message || "cloud sync failed")
   }
 }
 

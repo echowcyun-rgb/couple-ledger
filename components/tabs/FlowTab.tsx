@@ -16,9 +16,10 @@ export function FlowTab({
     | "cats"
     | "deleteTransaction"
     | "toast"
+    | "openEditRecord"
   >
 }) {
-  const { currentMonth, flowMonthSummary, flowFilter, setFlowFilter, members, filteredFlow, deleteTransaction, toast } = ledger
+  const { currentMonth, flowMonthSummary, flowFilter, setFlowFilter, members, filteredFlow, deleteTransaction, toast, openEditRecord } = ledger
 
   // 类型筛选: "all" | "out" | "in" | "save"
   const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
@@ -135,7 +136,7 @@ export function FlowTab({
                     <div className="flow-item-sub">{item.memberName}</div>
                   </div>
                   <div className="flow-item-actions">
-                    <button className="flow-act-btn" onClick={() => { /* 编辑功能待接入弹窗 */ }}>改</button>
+                    <button className="flow-act-btn" onClick={() => openEditRecord(item.id)}>改</button>
                     <button className="flow-act-btn del" onClick={async () => {
                       if (!confirm(`确认删除这条记录？`)) return
                       await deleteTransaction(item.id)

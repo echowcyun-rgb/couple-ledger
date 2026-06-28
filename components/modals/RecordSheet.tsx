@@ -1,5 +1,6 @@
 import { useState } from "react"
 import type { Ledger } from "@/hooks/useLedger"
+import { useSheetSwipe } from "@/hooks/useSheetSwipe"
 
 export function RecordSheet({
   ledger,
@@ -51,6 +52,7 @@ export function RecordSheet({
   } = ledger
 
   const [saving, setSaving] = useState(false)
+  const swipe = useSheetSwipe(() => setRecordOpen(false), recordOpen)
 
   function handleSave() {
     if (saving) return
@@ -64,7 +66,13 @@ export function RecordSheet({
   return (
     <>
       <div className={`sheet-mask ${recordOpen ? "show" : ""}`} onClick={() => setRecordOpen(false)} />
-      <div className={`sheet ${recordOpen ? "show" : ""}`} role="dialog" aria-label={editTxId ? "编辑账单" : "记一笔"}>
+      <div
+        className={`sheet ${recordOpen ? "show" : ""}`}
+        role="dialog"
+        aria-label={editTxId ? "编辑账单" : "记一笔"}
+        onTouchStart={swipe.onTouchStart}
+        onTouchEnd={swipe.onTouchEnd}
+      >
         <div className="sheet-grab" aria-hidden="true" />
 
         {/* 类型按钮 */}

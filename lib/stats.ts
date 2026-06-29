@@ -219,7 +219,7 @@ export function groupByDate(
     g.items.push({
       id: t.id,
       cat: t.categoryKey,
-      catLabel: cat?.label || t.categoryKey,
+      catLabel: cat?.label || (t.categoryKey ? t.categoryKey : "未分类"),
       catGlyph: cat?.glyph || "?",
       note: t.note,
       member: t.memberId,

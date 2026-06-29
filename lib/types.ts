@@ -93,7 +93,7 @@ export interface AppState {
 
 export interface ImportBatch {
   ids: string[]
-  source: "alipay" | "wechat"
+  source: "alipay" | "wechat" | "generic"
   recorder: string
   count: number
   time: string

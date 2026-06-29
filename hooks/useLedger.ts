@@ -5,7 +5,7 @@ import * as XLSX from "@e965/xlsx"
 import { SYS_AVATARS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
-import { importSnapshot, loadState, saveState, syncFromCloud } from "@/lib/storage"
+import { loadState, saveState, syncFromCloud } from "@/lib/storage"
 import {
   getInTrendData,
   getExpensePie,
@@ -29,6 +29,7 @@ import {
   parseGenericCsv,
   parseGenericXlsx,
   parseWechatCSV,
+  type ImportResult,
 } from "@/lib/importers"
 import type {
   AppState,
@@ -36,8 +37,6 @@ import type {
   Goal,
   ImportBatch,
   Member,
-  ReviewHabitAnalysis,
-  ReviewPlan,
   Tab,
   ThemeKey,
   Transaction,
@@ -101,6 +100,11 @@ export function useLedger() {
 
   const [coupleBgAdjustOpen, setCoupleBgAdjustOpen] = useState(false)
   const [pendingCoupleBgUrl, setPendingCoupleBgUrl] = useState("")
+
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false)
+  const [importPreviewSource, setImportPreviewSource] = useState<ImportBatch["source"]>("generic")
+  const [importPreviewTransactions, setImportPreviewTransactions] = useState<Transaction[]>([])
+  const [importPreviewRecorder, setImportPreviewRecorder] = useState("")
 
   const fileRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
@@ -569,22 +573,52 @@ export function useLedger() {
     setPendingCoupleBgUrl("")
   }, [])
 
+  const openImportPreview = useCallback((result: ImportResult, recorder: string) => {
+    if (result.transactions.length === 0) {
+      toast(GENERIC_BILL_IMPORT_HINT)
+      return
+    }
+    setImportPreviewSource(result.batch.source)
+    setImportPreviewTransactions(result.transactions)
+    setImportPreviewRecorder(recorder)
+    setImportPreviewOpen(true)
+  }, [toast])
+
+  const cancelImportPreview = useCallback(() => {
+    setImportPreviewOpen(false)
+    setImportPreviewTransactions([])
+    setImportPreviewRecorder("")
+  }, [])
+
+  const confirmImportPreview = useCallback((imported: Transaction[]) => {
+    const batch: ImportBatch = {
+      ids: imported.map((t) => t.id),
+      source: importPreviewSource,
+      recorder: importPreviewRecorder,
+      count: imported.length,
+      time: new Date().toISOString(),
+    }
+    setState((s) => ({
+      ...s,
+      transactions: [...imported, ...s.transactions],
+      importBatches: [batch, ...s.importBatches],
+    }))
+    const sourceLabel =
+      importPreviewSource === "alipay"
+        ? "支付宝"
+        : importPreviewSource === "wechat"
+          ? "微信"
+          : "通用"
+    toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
+    cancelImportPreview()
+  }, [importPreviewSource, importPreviewRecorder, cancelImportPreview, toast])
+
   const onImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const memberId = members[0]?.id || "wu"
     const lowerName = file.name.toLowerCase()
 
-    const applyGenericImport = (imported: Transaction[]) => {
-      if (imported.length === 0) {
-        toast(GENERIC_BILL_IMPORT_HINT)
-        return
-      }
-      setState((s) => ({ ...s, transactions: [...imported, ...s.transactions] }))
-      toast(`✅ 已导入 ${imported.length} 条账单`)
-    }
-
-    // .csv：优先支付宝/微信专用解析，失败则走通用 CSV
     if (lowerName.endsWith(".csv")) {
       const reader = new FileReader()
       reader.onload = (ev) => {
@@ -595,28 +629,13 @@ export function useLedger() {
           if (source === "alipay" || source === "wechat") {
             const result =
               source === "alipay"
-                ? parseAlipayCSV(text, memberId)
-                : parseWechatCSV(text, memberId)
-
-            if (result.transactions.length > 0) {
-              const batch: ImportBatch = {
-                ...result.batch,
-                time: new Date().toISOString(),
-              }
-              setState((s) => ({
-                ...s,
-                transactions: [...result.transactions, ...s.transactions],
-                importBatches: [batch, ...s.importBatches],
-              }))
-              toast(
-                `✅ 已导入 ${result.transactions.length} 条${source === "alipay" ? "支付宝" : "微信"}账单`
-              )
-              return
-            }
+                ? parseAlipayCSV(text, memberId, cats)
+                : parseWechatCSV(text, memberId, cats)
+            openImportPreview(result, memberId)
+            return
           }
 
-          // 通用 CSV（本应用导出、标准列名表格等）
-          applyGenericImport(parseGenericCsv(text, members, cats))
+          openImportPreview(parseGenericCsv(text, members, cats, memberId), memberId)
         } catch {
           toast("文件解析失败，请确认是有效的 CSV 文件")
         }
@@ -626,12 +645,14 @@ export function useLedger() {
       return
     }
 
-    // .xlsx / .xls → 通用 Excel 导入
     if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
       const reader = new FileReader()
       reader.onload = (ev) => {
         try {
-          applyGenericImport(parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats))
+          openImportPreview(
+            parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats, memberId),
+            memberId
+          )
         } catch {
           toast("文件解析失败，请检查格式")
         }
@@ -643,7 +664,7 @@ export function useLedger() {
 
     toast("仅支持 .csv / .xlsx / .xls 格式")
     e.target.value = ""
-  }, [members, cats, toast])
+  }, [members, cats, openImportPreview, toast])
 
   const prevReviewMonth = useCallback(() => {
     if (transactions.length === 0) {
@@ -838,6 +859,11 @@ export function useLedger() {
     onAvatarFile,
     onCoupleBgFile,
     onImportFile,
+    importPreviewOpen,
+    importPreviewSource,
+    importPreviewTransactions,
+    cancelImportPreview,
+    confirmImportPreview,
     deleteTransaction,
     exportTransactionsXlsx,
     prevReviewMonth,

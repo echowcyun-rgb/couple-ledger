@@ -12,6 +12,7 @@ import RoomSetup from "@/components/modals/RoomSetup"
 import { UpdateGoalSheet } from "@/components/modals/UpdateGoalSheet"
 import { EditGoalSheet } from "@/components/modals/EditGoalSheet"
 import { CoupleBgAdjustSheet } from "@/components/modals/CoupleBgAdjustSheet"
+import { ImportPreviewSheet } from "@/components/modals/ImportPreviewSheet"
 import { FlowTab } from "@/components/tabs/FlowTab"
 import { HomeTab } from "@/components/tabs/HomeTab"
 import { MineTab } from "@/components/tabs/MineTab"
@@ -73,6 +74,14 @@ export default function Page() {
         imageUrl={ledger.pendingCoupleBgUrl}
         onSave={ledger.saveCoupleBgAdjust}
         onCancel={ledger.cancelCoupleBgAdjust}
+      />
+      <ImportPreviewSheet
+        open={ledger.importPreviewOpen}
+        source={ledger.importPreviewSource}
+        transactions={ledger.importPreviewTransactions}
+        cats={ledger.cats}
+        onCancel={ledger.cancelImportPreview}
+        onConfirm={ledger.confirmImportPreview}
       />
 
       <Toast show={ledger.toastShow} msg={ledger.toastMsg} />

@@ -1,4 +1,5 @@
 import * as XLSX from "@e965/xlsx"
+import { matchCategoryByKeywords } from "./category-keywords"
 import type { Category, ImportBatch, Member, Transaction, TxType } from "./types"
 
 // ===== 导入结果类型 =====
@@ -8,38 +9,40 @@ export interface ImportResult {
   unrecognized: number
 }
 
-// ===== 分类映射 =====
-// 支付宝/微信关键词 → 系统分类 key
-const CATEGORY_KEYWORDS: Record<string, string> = {
-  // 餐饮
-  餐饮: "food", 美食: "food", 吃饭: "food", 外卖: "food", 早餐: "food",
-  午餐: "food", 晚餐: "food", 餐厅: "food", 咖啡: "food", 饮品: "food",
-  // 交通
-  交通: "car", 打车: "car", 加油: "car", 地铁: "car", 公交: "car",
-  停车: "car", 高铁: "car", 机票: "car", 出租车: "car",
-  // 购物
-  购物: "shop", 超市: "shop", 百货: "shop", 服装: "shop", 电商: "shop",
-  网购: "shop", 数码: "shop", 家电: "shop",
-  // 居家
-  居家: "home", 水电: "home", 物业: "home", 房租: "home", 缴费: "home",
-  话费: "home", 网费: "home", 燃气: "home",
-  // 娱乐
-  娱乐: "fun", 游戏: "fun", 电影: "fun", 旅游: "fun", 健身: "fun",
-  运动: "fun", 音乐: "fun", 视频: "fun",
-  // 医疗
-  医疗: "med", 医院: "med", 药品: "med", 体检: "med", 牙科: "med",
-  // 工资收入
-  工资: "salary", 薪资: "salary", 奖金: "salary", 补贴: "salary",
-  // 红包/转账收入
-  转账: "gift", 红包: "gift", 退款: "gift",
+function resolveCategoryFromCell(
+  raw: string,
+  cats: Category[]
+): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ""
+  const byKey = cats.find((c) => c.key === trimmed)
+  const byLabel = cats.find((c) => c.label === trimmed)
+  if (byLabel) return byLabel.key
+  if (byKey) return byKey.key
+  return ""
 }
 
-function guessCategory(desc: string, type: "out" | "in"): string {
-  const lower = desc.toLowerCase()
-  for (const [keyword, catKey] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (lower.includes(keyword.toLowerCase())) return catKey
+function suggestCategory(
+  matchText: string,
+  type: TxType,
+  cats: Category[],
+  explicitKey = ""
+): string {
+  if (explicitKey) return explicitKey
+  return matchCategoryByKeywords(matchText, type, cats)
+}
+
+function makeBatch(
+  transactions: Transaction[],
+  source: ImportBatch["source"],
+  recorder: string
+): Omit<ImportBatch, "time"> {
+  return {
+    ids: transactions.map((t) => t.id),
+    source,
+    recorder,
+    count: transactions.length,
   }
-  return type === "in" ? "salary" : "food"
 }
 
 // ===== CSV 解析 =====
@@ -71,7 +74,8 @@ function parseCSVLine(line: string): string[] {
  */
 export function parseAlipayCSV(
   content: string,
-  memberId: string
+  memberId: string,
+  cats: Category[] = []
 ): ImportResult {
   const lines = content.split("\n").filter((l) => l.trim())
   const transactions: Transaction[] = []
@@ -79,7 +83,6 @@ export function parseAlipayCSV(
   let headerIdx = -1
 
   for (let i = 0; i < lines.length; i++) {
-    // 找表头行
     if (
       headerIdx < 0 &&
       (lines[i].includes("交易时间") || lines[i].includes("收/支"))
@@ -98,10 +101,11 @@ export function parseAlipayCSV(
     const date = cols[0]?.slice(0, 10) || ""
     const typeLabel = cols[4]?.trim() || ""
     const amountStr = cols[5]?.trim() || ""
-    const desc = cols[3]?.trim() || cols[2]?.trim() || ""
+    const counterparty = cols[2]?.trim() || ""
+    const desc = cols[3]?.trim() || ""
     const note = cols[9]?.trim() || ""
+    const categoryLabel = cols[1]?.trim() || ""
 
-    // 过滤无效行
     if (!date || !amountStr) {
       unrecognized++
       continue
@@ -113,36 +117,33 @@ export function parseAlipayCSV(
       continue
     }
 
-    const type: "out" | "in" | "save" =
+    const type: TxType =
       typeLabel === "收入" ? "in" : typeLabel === "支出" ? "out" : "out"
 
-    // 过滤已关闭/已退款的交易
     const status = cols[6]?.trim() || ""
     if (status.includes("关闭") || status.includes("退款")) {
       unrecognized++
       continue
     }
 
+    const matchText = [desc, note, counterparty].filter(Boolean).join(" ")
+    const explicitKey = resolveCategoryFromCell(categoryLabel, cats)
+
     transactions.push({
       id: `tx_ali_${Date.now()}_${i}`,
       date,
       type,
       amount,
-      categoryKey: guessCategory(desc + note, type),
+      categoryKey: suggestCategory(matchText, type, cats, explicitKey),
       memberId,
-      note: desc || note,
+      note: desc || note || counterparty,
       createdAt: Date.now() + i,
     })
   }
 
   return {
     transactions,
-    batch: {
-      ids: transactions.map((t) => t.id),
-      source: "alipay",
-      recorder: memberId,
-      count: transactions.length,
-    },
+    batch: makeBatch(transactions, "alipay", memberId),
     unrecognized,
   }
 }
@@ -155,7 +156,8 @@ export function parseAlipayCSV(
  */
 export function parseWechatCSV(
   content: string,
-  memberId: string
+  memberId: string,
+  cats: Category[] = []
 ): ImportResult {
   const lines = content.split("\n").filter((l) => l.trim())
   const transactions: Transaction[] = []
@@ -163,7 +165,6 @@ export function parseWechatCSV(
   let headerIdx = -1
 
   for (let i = 0; i < lines.length; i++) {
-    // 找表头行
     if (
       headerIdx < 0 &&
       (lines[i].includes("交易时间") || lines[i].includes("收/支"))
@@ -182,8 +183,10 @@ export function parseWechatCSV(
     const date = cols[0]?.slice(0, 10) || ""
     const typeLabel = cols[4]?.trim() || ""
     const amountStr = cols[5]?.trim() || ""
-    const desc = cols[3]?.trim() || cols[2]?.trim() || ""
+    const counterparty = cols[2]?.trim() || ""
+    const desc = cols[3]?.trim() || ""
     const note = cols[10]?.trim() || ""
+    const typeName = cols[1]?.trim() || ""
 
     if (!date || !amountStr) {
       unrecognized++
@@ -196,7 +199,7 @@ export function parseWechatCSV(
       continue
     }
 
-    const type: "out" | "in" | "save" =
+    const type: TxType =
       typeLabel === "收入" ? "in" : typeLabel === "支出" ? "out" : "out"
 
     const status = cols[7]?.trim() || ""
@@ -205,26 +208,24 @@ export function parseWechatCSV(
       continue
     }
 
+    const matchText = [desc, note, counterparty, typeName].filter(Boolean).join(" ")
+    const explicitKey = resolveCategoryFromCell(typeName, cats)
+
     transactions.push({
       id: `tx_wx_${Date.now()}_${i}`,
       date,
       type,
       amount,
-      categoryKey: guessCategory(desc + note, type),
+      categoryKey: suggestCategory(matchText, type, cats, explicitKey),
       memberId,
-      note: desc || note,
+      note: desc || note || counterparty,
       createdAt: Date.now() + i,
     })
   }
 
   return {
     transactions,
-    batch: {
-      ids: transactions.map((t) => t.id),
-      source: "wechat",
-      recorder: memberId,
-      count: transactions.length,
-    },
+    batch: makeBatch(transactions, "wechat", memberId),
     unrecognized,
   }
 }
@@ -235,18 +236,15 @@ export function detectSource(
   content: string
 ): "alipay" | "wechat" | "unknown" {
   const firstFew = content.slice(0, 500)
-  // 微信账单在文件头有标识字样
   if (firstFew.includes("微信支付账单明细") || firstFew.includes("微信账单")) {
     return "wechat"
   }
-  // 支付宝常见标识
   if (
     firstFew.includes("支付宝") &&
     (firstFew.includes("账单") || firstFew.includes("交易流水"))
   ) {
     return "alipay"
   }
-  // 看列名特征
   if (firstFew.includes("商品说明") && firstFew.includes("收/支")) {
     return firstFew.includes("交易分类") ? "alipay" : "wechat"
   }
@@ -285,7 +283,6 @@ function getCell(row: Record<string, unknown>, ...keys: string[]): unknown {
   return undefined
 }
 
-/** 判断是否为表头行（避免把标题行当数据） */
 function isHeaderLikeRow(row: Record<string, unknown>): boolean {
   const date = String(getCell(row, "date", "日期", "时间", "交易时间", "交易日期") ?? "").trim()
   const type = String(getCell(row, "type", "类型", "收支类型", "收/支", "收支") ?? "").trim()
@@ -297,7 +294,6 @@ function isHeaderLikeRow(row: Record<string, unknown>): boolean {
   )
 }
 
-/** 扫描前 25 行，定位真正的列名行（兼容微信/支付宝 xlsx 顶部标题行） */
 function findHeaderRowIndex(sheet: XLSX.WorkSheet): number {
   const ref = sheet["!ref"]
   if (!ref) return 0
@@ -333,7 +329,6 @@ function parseImportDate(raw: unknown): string {
     }
   }
   const s = String(raw).trim()
-  // Excel 序列号被读成字符串（raw:false 时常见）
   if (/^\d{4,5}(\.\d+)?$/.test(s)) {
     const parsed = XLSX.SSF.parse_date_code(Number(s))
     if (parsed) {
@@ -367,15 +362,14 @@ function parseImportAmount(raw: unknown): number {
   return parseFloat(String(raw).replace(/,/g, "").replace(/[¥￥]/g, "").trim())
 }
 
-/** 通用导入格式说明（CSV / xlsx 共用） */
 export const GENERIC_BILL_IMPORT_HINT =
   "无法识别账单数据，请确保文件包含 日期/类型/金额 列（类型：支出/收入/存钱 或 out/in/save）"
 
-/** 将表格行解析为交易记录（CSV / xlsx 共用） */
 function rowsToTransactions(
   rows: Record<string, unknown>[],
   members: Member[],
-  cats: Category[]
+  cats: Category[],
+  memberId: string
 ): Transaction[] {
   return rows
     .map((row, idx) => {
@@ -391,37 +385,38 @@ function rowsToTransactions(
         getCell(row, "amount", "金额", "数额", "交易金额", "金额(元)", "金额（元）")
       )
 
-      let categoryKey = String(
-        getCell(row, "categoryKey", "分类", "category", "类别", "交易分类", "商品说明") ?? ""
+      const rawCategory = String(
+        getCell(row, "categoryKey", "分类", "category", "类别", "交易分类") ?? ""
       ).trim()
-      if (categoryKey) {
-        const byKey = cats.find((c) => c.key === categoryKey)
-        const byLabel = cats.find((c) => c.label === categoryKey)
-        if (byLabel) categoryKey = byLabel.key
-        else if (!byKey) categoryKey = ""
-      }
-
-      let memberId = String(
+      const product = String(
+        getCell(row, "商品说明", "说明", "商品", "摘要") ?? ""
+      ).trim()
+      const note = String(getCell(row, "note", "备注") ?? "").trim()
+      const counterparty = String(
         getCell(row, "memberId", "成员", "member", "经手人", "交易对方") ?? ""
       ).trim()
-      if (memberId) {
-        const matched = members.find((m) => m.id === memberId || m.name === memberId)
-        memberId = matched?.id || memberId
+
+      let resolvedMemberId = counterparty
+      if (resolvedMemberId) {
+        const matched = members.find((m) => m.id === resolvedMemberId || m.name === resolvedMemberId)
+        resolvedMemberId = matched?.id || resolvedMemberId
       } else {
-        memberId = members[0]?.id || ""
+        resolvedMemberId = members[0]?.id || memberId
       }
 
-      const note = String(getCell(row, "note", "备注", "说明") ?? "").trim()
       if (!date || !type || !Number.isFinite(amount) || amount <= 0) return null
+
+      const explicitKey = resolveCategoryFromCell(rawCategory, cats)
+      const matchText = [product, note, counterparty].filter(Boolean).join(" ")
 
       return {
         id: `tx_import_${Date.now()}_${idx}`,
         date,
         type,
         amount: Math.abs(amount),
-        categoryKey: categoryKey || (type === "in" ? "salary" : type === "save" ? "save" : "food"),
-        memberId,
-        note,
+        categoryKey: suggestCategory(matchText, type, cats, explicitKey),
+        memberId: resolvedMemberId,
+        note: note || product || counterparty,
         createdAt: Date.now() + idx,
       }
     })
@@ -440,23 +435,48 @@ function sheetRowsFromWorkbook(wb: XLSX.WorkBook): Record<string, unknown>[] {
   })
 }
 
-/** 解析通用 CSV 账单（本应用导出 / 标准列名 / 微信支付宝 xlsx 转存） */
+function buildGenericResult(
+  transactions: Transaction[],
+  memberId: string
+): ImportResult {
+  return {
+    transactions,
+    batch: makeBatch(transactions, "generic", memberId),
+    unrecognized: 0,
+  }
+}
+
 export function parseGenericCsv(
   content: string,
   members: Member[],
-  cats: Category[] = []
-): Transaction[] {
+  cats: Category[] = [],
+  memberId?: string
+): ImportResult {
+  const recorder = memberId || members[0]?.id || ""
   const text = content.replace(/^\uFEFF/, "")
   const wb = XLSX.read(text, { type: "string", cellDates: true })
-  return rowsToTransactions(sheetRowsFromWorkbook(wb), members, cats)
+  const transactions = rowsToTransactions(
+    sheetRowsFromWorkbook(wb),
+    members,
+    cats,
+    recorder
+  )
+  return buildGenericResult(transactions, recorder)
 }
 
-/** 解析通用 Excel 账单（.xlsx / .xls） */
 export function parseGenericXlsx(
   buffer: ArrayBuffer,
   members: Member[],
-  cats: Category[] = []
-): Transaction[] {
+  cats: Category[] = [],
+  memberId?: string
+): ImportResult {
+  const recorder = memberId || members[0]?.id || ""
   const wb = XLSX.read(new Uint8Array(buffer), { type: "array", cellDates: true })
-  return rowsToTransactions(sheetRowsFromWorkbook(wb), members, cats)
+  const transactions = rowsToTransactions(
+    sheetRowsFromWorkbook(wb),
+    members,
+    cats,
+    recorder
+  )
+  return buildGenericResult(transactions, recorder)
 }

@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx"
+import * as XLSX from "@e965/xlsx"
 import type { Category, ImportBatch, Member, Transaction, TxType } from "./types"
 
 // ===== 导入结果类型 =====

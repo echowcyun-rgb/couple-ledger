@@ -470,11 +470,21 @@ export function useLedger() {
     const num = Number(updateAmount)
     if (!num || num < 0) { toast("请输入有效金额"); return }
     if (!updateMemberId) { toast("请选择经手人"); return }
-    let newCurrent = num
+    const todayStr = new Date().toLocaleDateString("zh-CN")
+    let newCurrent: number
+    let historyAmount: number
+    let historyNote: string
+
     if (updateMode === "pct") {
       newCurrent = Math.round(updateGoal.target * (num / 100))
+      historyAmount = newCurrent
+      historyNote = updateNote || "手动更新"
+    } else {
+      newCurrent = updateGoal.current + num
+      historyAmount = num
+      historyNote = updateNote || "存入"
     }
-    const todayStr = new Date().toLocaleDateString("zh-CN")
+
     setState((s) => ({
       ...s,
       goals: s.goals.map((x) =>
@@ -482,7 +492,10 @@ export function useLedger() {
           ? {
               ...x,
               current: newCurrent,
-              history: [{ date: todayStr, amount: newCurrent, note: updateNote || "手动更新", memberId: updateMemberId }, ...x.history].slice(0, 20),
+              history: [
+                { date: todayStr, amount: historyAmount, note: historyNote, memberId: updateMemberId },
+                ...x.history,
+              ].slice(0, 20),
             }
           : x
       ),

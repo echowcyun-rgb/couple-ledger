@@ -83,8 +83,20 @@ export function UpdateGoalSheet({
               <button className={`upd-mode ${updateMode === "amount" ? "on" : ""}`} onClick={() => setUpdateMode("amount")}>按金额</button>
               <button className={`upd-mode ${updateMode === "pct" ? "on" : ""}`} onClick={() => setUpdateMode("pct")}>当月总存款百分比</button>
             </div>
-            <div className="upd-field-label">{updateMode === "amount" ? "已存金额（元）" : "占当月总存款百分比（%）"}</div>
-            <input className="upd-input" type="number" inputMode="decimal" placeholder="0" value={updateAmount} onChange={(e) => setUpdateAmount(e.target.value)} />
+            <div className="upd-field-label">{updateMode === "amount" ? "本次存入（元）" : "占当月总存款百分比（%）"}</div>
+            <input
+              className="upd-input"
+              type="number"
+              inputMode="decimal"
+              placeholder={updateMode === "amount" ? "0" : "0"}
+              value={updateAmount}
+              onChange={(e) => setUpdateAmount(e.target.value)}
+            />
+            {updateMode === "amount" && updateAmount && !Number.isNaN(Number(updateAmount)) && Number(updateAmount) > 0 && (
+              <div className="upd-field-hint">
+                更新后将达到 ¥{(updateGoal.current + Number(updateAmount)).toLocaleString()}
+              </div>
+            )}
             <div className="upd-field-label">备注（选填）</div>
             <input className="upd-input" placeholder="如：本月工资存入" value={updateNote} onChange={(e) => setUpdateNote(e.target.value)} />
             <div className="upd-btns">

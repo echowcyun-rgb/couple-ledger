@@ -14,10 +14,10 @@ export function HomeTab({
     | "today"
     | "setGoalOpen"
     | "openRecord"
-    | "openEditGoal"
+    | "openUpdateGoal"
   >
 }) {
-  const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord, openEditGoal } = ledger
+  const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord, openUpdateGoal } = ledger
   const now = new Date()
 
   // 存钱目标卡片底色（实心，不受头部遮罩影响）
@@ -77,12 +77,12 @@ export function HomeTab({
                       style={{ background: GOAL_CARD_COLORS[idx] || GOAL_CARD_COLORS[0] }}
                       role="button"
                       tabIndex={0}
-                      aria-label={`编辑目标 ${g.name}`}
-                      onClick={() => openEditGoal(g.id)}
+                      aria-label={`更新目标进度 ${g.name}`}
+                      onClick={() => openUpdateGoal(g.id)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
-                          openEditGoal(g.id)
+                          openUpdateGoal(g.id)
                         }
                       }}
                     >

@@ -221,14 +221,15 @@
 .app .couple-bg-mask { position: absolute; inset: 0; background: rgba(255,255,255,.38); pointer-events: none; }
 .app .couple-inner-new { position: relative; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 122px; }
 .app .couple-left { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.app .couple-avatars-new { display: flex; align-items: center; gap: 0; }
+.app .couple-avatars-new { display: flex; align-items: center; justify-content: center; gap: 0; }
+.app .couple-av-item { display: flex; align-items: center; }
 .app .couple-av { width: 60px; height: 60px; }
-.app .couple-heart { font-family: var(--font-pixel), monospace; font-size: 18px; color: var(--out); margin: 0 6px; text-shadow: 2px 2px 0 rgba(0,0,0,.3); line-height: 1; }
+.app .couple-heart { font-family: var(--font-pixel), monospace; font-size: 18px; color: var(--out); margin: 0 6px; text-shadow: 2px 2px 0 rgba(0,0,0,.3); line-height: 1; flex-shrink: 0; }
 .app .couple-names-row { font-size: 13px; color: var(--cream); text-shadow: 1px 1px 0 rgba(0,0,0,.4); }
 .app .couple-right { text-align: right; }
-.app .couple-days-label { font-family: var(--font-pixel-cjk), monospace; font-size: 10px; color: var(--cream); opacity: .92; text-shadow: 1px 1px 0 rgba(0,0,0,.3); margin-bottom: 4px; }
-.app .couple-days-num { font-family: var(--font-pixel), monospace; font-size: 42px; color: var(--cream); line-height: 1; text-shadow: 3px 3px 0 rgba(0,0,0,.25); }
-.app .couple-days-unit { font-family: var(--font-pixel-cjk), monospace; font-size: 11px; color: var(--cream); opacity: .92; text-shadow: 1px 1px 0 rgba(0,0,0,.3); margin-top: 4px; }
+.app .couple-days-label { font-family: var(--font-pixel-cjk), monospace; font-size: 10px; color: var(--out); opacity: .92; text-shadow: 1px 1px 0 rgba(0,0,0,.3); margin-bottom: 4px; }
+.app .couple-days-num { font-family: var(--font-pixel), monospace; font-size: 42px; color: var(--out); line-height: 1; text-shadow: 3px 3px 0 rgba(0,0,0,.25); }
+.app .couple-days-unit { font-family: var(--font-pixel-cjk), monospace; font-size: 11px; color: var(--out); opacity: .92; text-shadow: 1px 1px 0 rgba(0,0,0,.3); margin-top: 4px; }
 .app .couple-card-hint { position: absolute; bottom: 8px; right: 10px; font-family: var(--font-pixel-cjk), monospace; font-size: 9px; color: rgba(255,255,255,.6); pointer-events: none; }
 
 /* 背景图位置调整 */
@@ -396,6 +397,7 @@
 /* 更新进度弹窗 */
 .app .upd-meta { font-size: 10px; color: var(--text-sub); margin-bottom: 16px; line-height: 1.8; }
 .app .upd-field-label { font-size: 11px; color: var(--text-sub); margin-bottom: 8px; }
+.app .upd-field-hint { font-size: 10px; color: var(--accent-dark); margin: -10px 0 12px; }
 .app .upd-modes { display: flex; gap: 10px; margin-bottom: 16px; }
 .app .upd-mode { flex: 1; border: 3px solid var(--ink); border-radius: 10px; background: var(--cream); color: var(--text-sub); font-family: var(--font-pixel-cjk), monospace; font-size: 11px; padding: 10px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); transition: all .1s steps(2); }
 .app .upd-mode.on { background: var(--accent); color: var(--cream); }
@@ -588,7 +590,21 @@
 .app .goal-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .app .goal-card-emoji { font-size: 18px; }
 .app .goal-card-name { font-family: var(--font-pixel-cjk), monospace; font-size: 12px; color: #FFFFFF; flex: 1; }
-.app .goal-card-days { font-family: var(--font-pixel), monospace; font-size: 9px; color: #FFFFFF; font-weight: 700; }
+.app .goal-card-days {
+  font-family: var(--font-pixel), monospace;
+  font-size: 13px;
+  color: #FFFFFF;
+  font-weight: 700;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+    -1px  0   0 #000,
+     1px  0   0 #000,
+     0   -1px 0 #000,
+     0    1px 0 #000;
+}
 .app .goal-card-amt { font-family: var(--font-pixel), monospace; font-size: 11px; color: #FFFFFF; margin-top: 4px; }
 .app .goal-card-amt .cur { color: #FFFFFF; }
 .app .goal-card-amt .tgt { color: rgba(255,255,255,.7); }

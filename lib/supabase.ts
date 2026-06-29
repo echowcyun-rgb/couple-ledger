@@ -24,6 +24,27 @@ export function isCloudReady(): boolean {
   return supabase !== null
 }
 
+/** 本地模式房号存储 key（Supabase 不可用时 fallback） */
+const LOCAL_ROOMS_KEY = "couple-local-rooms"
+
+function getLocalRooms(): string[] {
+  if (typeof window === "undefined") return []
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_ROOMS_KEY) || "[]")
+  } catch {
+    return []
+  }
+}
+
+function saveLocalRoom(code: string): void {
+  if (typeof window === "undefined") return
+  const existing = getLocalRooms()
+  if (!existing.includes(code)) {
+    existing.push(code)
+    localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify(existing))
+  }
+}
+
 // ===== 通用超时包装 =====
 function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
   return Promise.race([
@@ -140,6 +161,7 @@ export async function pullGoals(roomId: string): Promise<Goal[]> {
       contributions: (g.contributions as Record<string, number>) || {},
       history: (g.history as Goal["history"]) || [],
       deadline: (g.deadline as string) || "",
+      completedAt: (g.completedAt as string) || undefined,
     }))
   } catch (e) {
     console.warn("拉取云端目标失败:", e)
@@ -167,6 +189,7 @@ export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean>
       contributions: g.contributions,
       history: g.history,
       deadline: g.deadline || "",
+      completedAt: g.completedAt || null,
     }))
     const { error: insErr } = await withTimeout(
       supabase.from("goals").insert(rows)
@@ -270,7 +293,10 @@ export async function pushImportBatches(batches: ImportBatch[], roomId: string):
 
 /** 验证房号是否存在 */
 export async function validateRoom(roomId: string): Promise<boolean> {
-  if (!supabase) return false
+  // 本地模式 fallback：检查 localStorage 中的房号列表
+  if (!supabase) {
+    return getLocalRooms().includes(roomId)
+  }
   try {
     const { data, error } = await supabase
       .from("couples")
@@ -286,7 +312,24 @@ export async function validateRoom(roomId: string): Promise<boolean> {
 
 /** 创建新房间，返回房号 */
 export async function createRoom(): Promise<string> {
-  if (!supabase) return ""
+  // 本地模式 fallback：生成随机4位房号存入 localStorage
+  if (!supabase) {
+    const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
+    const existing = getLocalRooms()
+    let code = generateCode()
+    let attempts = 0
+    while (attempts < 20) {
+      if (!existing.includes(code)) {
+        saveLocalRoom(code)
+        console.log("[createRoom] 本地模式创建房号:", code)
+        return code
+      }
+      code = generateCode()
+      attempts++
+    }
+    console.warn("[createRoom] 本地模式生成房号失败，已达最大尝试次数")
+    return ""
+  }
   // 生成4位随机数
   const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
   let roomId = generateCode()

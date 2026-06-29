@@ -93,12 +93,31 @@ export function FlowTab({
   }
 
   function handleTouchEnd(id: string) {
+    applySwipeResult(id)
+  }
+
+  // 鼠标左滑（桌面端 fallback，逻辑与 touch 相同）
+  function handleMouseDown(e: React.MouseEvent, id: string) {
+    touchStartX.current = e.clientX
+    touchCurrentX.current = e.clientX
+    if (swipedId && swipedId !== id) {
+      setSwipedId(null)
+    }
+  }
+
+  function handleMouseMove(e: React.MouseEvent) {
+    touchCurrentX.current = e.clientX
+  }
+
+  function handleMouseUp(id: string) {
+    applySwipeResult(id)
+  }
+
+  function applySwipeResult(id: string) {
     const diff = touchStartX.current - touchCurrentX.current
     if (diff > 60) {
-      // 左滑超过阈值，显示删除按钮
       setSwipedId(id)
     } else if (diff < -30) {
-      // 右滑关闭
       setSwipedId(null)
     }
   }
@@ -136,27 +155,32 @@ export function FlowTab({
         <div className="fs-sep" aria-hidden="true" />
         <div className="fs-item"><div className="fs-label">结余</div><div className="fs-num">{yuan(flowMonthSummary.balance)}</div></div>
       </div>
-      {/* 类型筛选 */}
-      <div className="filters">
-        {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
-          <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)}>{f.label}</button>
-        ))}
-      </div>
-      {/* 分类筛选 */}
-      <div className="filters">
-        <button className={`filter ${catFilter === "all" ? "on" : ""}`} onClick={() => setCatFilter("all")}>全部分类</button>
-        {cats.map(c => (
-          <button key={c.key} className={`filter ${catFilter === c.key ? "on" : ""}`} onClick={() => setCatFilter(c.key)}>
-            {c.glyph} {c.label}
-          </button>
-        ))}
-      </div>
-      {/* 经手人筛选 */}
-      <div className="filters">
-        <button className={`filter ${flowFilter === "all" ? "on" : ""}`} onClick={() => setFlowFilter("all")}>全部经手人</button>
-        {members.map((m) => (
-          <button key={m.id} className={`filter ${flowFilter === m.id ? "on" : ""}`} onClick={() => setFlowFilter(m.id)}>{m.name}</button>
-        ))}
+      {/* 筛选区：类型横排 + 分类下拉 + 经手人横排 */}
+      <div className="flow-filter-row">
+        <div className="filters">
+          {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
+            <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)}>{f.label}</button>
+          ))}
+        </div>
+        <div className="rec-field flow-cat-select">
+          <span className="rec-field-label">分类</span>
+          <select
+            className="rec-select"
+            value={catFilter}
+            onChange={(e) => setCatFilter(e.target.value)}
+          >
+            <option value="all">全部分类</option>
+            {cats.map(c => (
+              <option key={c.key} value={c.key}>{c.glyph} {c.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filters">
+          <button className={`filter ${flowFilter === "all" ? "on" : ""}`} onClick={() => setFlowFilter("all")}>全部经手人</button>
+          {members.map((m) => (
+            <button key={m.id} className={`filter ${flowFilter === m.id ? "on" : ""}`} onClick={() => setFlowFilter(m.id)}>{m.name}</button>
+          ))}
+        </div>
       </div>
       {/* 批量操作栏 */}
       {displayItems.length > 0 && (
@@ -194,6 +218,9 @@ export function FlowTab({
                   onTouchStart={(e) => handleTouchStart(e, item.id)}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={() => handleTouchEnd(item.id)}
+                  onMouseDown={(e) => handleMouseDown(e, item.id)}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={() => handleMouseUp(item.id)}
                 >
                   <div
                     className={`flow-item ${swipedId === item.id ? "swiped" : ""}`}

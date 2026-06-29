@@ -19,6 +19,13 @@ export function HomeTab({
   const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
   const now = new Date()
 
+  // 存钱目标卡片底色（橙/米黄/粉红，与绿色 battle 背景区分）
+  const GOAL_CARD_COLORS = [
+    "rgba(240, 160, 60, 0.55)",
+    "rgba(240, 210, 140, 0.55)",
+    "rgba(217, 106, 126, 0.55)",
+  ]
+
   return (
     <section className="page active">
       <header className="topbar">
@@ -38,6 +45,7 @@ export function HomeTab({
 
       <div className="battle">
         <div className="battle-pattern" aria-hidden="true" />
+        <div className="battle-white-overlay" aria-hidden="true" />
         <div className="battle-inner">
           <div className="battle-head">
             <div className="battle-title">★ 存钱大作战</div>
@@ -59,11 +67,6 @@ export function HomeTab({
                   const daysLeft = g.deadline
                     ? Math.max(0, Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
                     : null
-                  const GOAL_CARD_COLORS = [
-                    'rgba(61, 174, 131, 0.35)',
-                    'rgba(96, 121, 201, 0.35)',
-                    'rgba(240, 160, 60, 0.35)',
-                  ]
                   return (
                     <div className="goal-card" key={g.id} style={{ background: GOAL_CARD_COLORS[idx] || GOAL_CARD_COLORS[0] }}>
                       <div className="goal-card-head">
@@ -104,51 +107,57 @@ export function HomeTab({
 
       <div className="section-title">成员收支</div>
       <div className="card">
-        <div className="pay-multi">
-          {members.map((m) => {
-            const mp = m.payday
-            const mIsPayday = today === mp
-            const dInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-            const mDays = today < mp ? mp - today : dInMonth - today + mp
-            return (
-              <div key={m.id} className={`payrow ${mIsPayday ? "today" : ""}`}>
-                <img className="pixavatar xs" src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
-                <span className="pay-mname">{m.name}</span>
-                {mIsPayday ? (
-                  <>
-                    <span className="ptext">今天发工资啦！</span>
-                    <button className="px-btn solid sm" style={{ marginLeft: "auto" }} onClick={openRecord}>记一笔 ▶</button>
-                  </>
-                ) : (
-                  <>
-                    <span className="ptext" style={{ marginLeft: 4 }}>还有</span>
-                    <span className="pdays">{mDays}</span>
-                    <span className="ptext">天发薪</span>
-                    <span className="ptip" style={{ marginLeft: "auto" }}>每月 {mp} 号</span>
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-        <div className="members">
-          {members.map((m, i) => {
-            const ms = memberSummaries.find((s) => s.memberId === m.id)
-            return (
-              <div className="member" key={m.id}>
-                <div className="mhead">
-                  <img className={`pixavatar sm ${i === 0 ? "a" : "b"}`} src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
-                  <div><div className="mname">{m.name}</div><div className="mtag">本月</div></div>
-                </div>
-                <div className="rows">
-                  <div className="r"><span>收入</span><b className="in">{yuan(ms?.income ?? 0)}</b></div>
-                  <div className="r"><span>支出</span><b className="out">{yuan(ms?.expense ?? 0)}</b></div>
-                  <div className="r"><span>存钱</span><b className="save">{yuan(ms?.savings ?? 0)}</b></div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        {members.length > 0 ? (
+          <>
+            <div className="pay-multi">
+              {members.map((m) => {
+                const mp = m.payday
+                const mIsPayday = today === mp
+                const dInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+                const mDays = today < mp ? mp - today : dInMonth - today + mp
+                return (
+                  <div key={m.id} className={`payrow ${mIsPayday ? "today" : ""}`}>
+                    <img className="pixavatar xs" src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
+                    <span className="pay-mname">{m.name}</span>
+                    {mIsPayday ? (
+                      <>
+                        <span className="ptext">今天发工资啦！</span>
+                        <button className="px-btn solid sm" style={{ marginLeft: "auto" }} onClick={openRecord}>记一笔 ▶</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="ptext" style={{ marginLeft: 4 }}>还有</span>
+                        <span className="pdays">{mDays}</span>
+                        <span className="ptext">天发薪</span>
+                        <span className="ptip" style={{ marginLeft: "auto" }}>每月 {mp} 号</span>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="members">
+              {members.map((m, i) => {
+                const ms = memberSummaries.find((s) => s.memberId === m.id)
+                return (
+                  <div className="member" key={m.id}>
+                    <div className="mhead">
+                      <img className={`pixavatar sm ${i === 0 ? "a" : "b"}`} src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
+                      <div><div className="mname">{m.name}</div><div className="mtag">本月</div></div>
+                    </div>
+                    <div className="rows">
+                      <div className="r"><span>收入</span><b className="in">{yuan(ms?.income ?? 0)}</b></div>
+                      <div className="r"><span>支出</span><b className="out">{yuan(ms?.expense ?? 0)}</b></div>
+                      <div className="r"><span>存钱</span><b className="save">{yuan(ms?.savings ?? 0)}</b></div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        ) : (
+          <div className="empty-hint">请先在「我的→成员管理」添加成员</div>
+        )}
       </div>
     </section>
   )

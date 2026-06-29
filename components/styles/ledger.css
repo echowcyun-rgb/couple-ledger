@@ -50,7 +50,8 @@
     repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 5px, transparent 5px 10px);
   background-size: 26px 26px, 100% 10px;
 }
-.app .battle-inner { position: relative; padding: 16px; }
+.app .battle-white-overlay { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.18); pointer-events: none; z-index: 1; }
+.app .battle-inner { position: relative; z-index: 2; padding: 16px; }
 .app .battle-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .app .battle-title { color: var(--cream); font-size: 14px; text-shadow: 2px 2px 0 rgba(0,0,0,.25); }
 .app .quest { font-family: var(--font-pixel-cjk), monospace; font-size: 11px; color: var(--cream); background: rgba(0,0,0,.2); display: inline-block; padding: 6px 10px; border-radius: 8px; margin-bottom: 12px; }
@@ -130,6 +131,9 @@
 .app .fs-num.save { color: var(--save); }
 .app .fs-sep { width: 3px; align-self: stretch; background: var(--ink); border-radius: 2px; opacity: .15; }
 .app .filters { display: flex; gap: 8px; margin-bottom: 16px; }
+.app .flow-filter-row .filters { margin-bottom: 12px; }
+.app .flow-filter-row .flow-cat-select { margin-bottom: 16px; }
+.app .flow-cat-select .rec-select { width: 100%; }
 .app .filter { flex: 1; border: 3px solid var(--ink); border-radius: 10px; background: var(--card); color: var(--text-sub); font-family: var(--font-pixel-cjk), monospace; font-size: 11px; padding: 8px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); transition: all .1s steps(2); }
 .app .filter.on { background: var(--accent); color: var(--cream); }
 .app .filter:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
@@ -540,9 +544,9 @@
 .app .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
 .app .cal-head-cell { font-family: var(--font-pixel-cjk), monospace; font-size: 8px; color: var(--text-sub); text-align: center; padding: 2px; }
 .app .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-.app .cal-cell { aspect-ratio: 1; border: 2px solid var(--ink); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; min-height: 42px; transition: background .1s; }
+.app .cal-cell { aspect-ratio: 1; border: 2px solid var(--ink); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; min-height: 44px; transition: background .1s; }
 .app .cal-cell.empty { border-color: transparent; background: transparent; }
 .app .cal-cell.has-data { border-color: var(--ink); }
 .app .cal-cell.today { border-color: var(--accent); border-width: 3px; }
 .app .cal-day-num { font-family: var(--font-pixel), monospace; font-size: 9px; color: var(--ink); line-height: 1; }
-.app .cal-amount { font-family: var(--font-pixel), monospace; font-size: 7px; color: var(--ink); opacity: .8; line-height: 1; margin-top: 2px; }
+.app .cal-amount { font-family: var(--font-pixel), monospace; font-size: 6px; color: var(--ink); opacity: .8; line-height: 1; margin-top: 2px; }

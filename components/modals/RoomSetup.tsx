@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createRoom, validateRoom } from "@/lib/supabase"
+import { createRoom, validateRoom, isCloudReady } from "@/lib/supabase"
 
 interface Props {
   onDone: (roomId: string) => void
@@ -17,14 +17,33 @@ export default function RoomSetup({ onDone }: Props) {
   const handleCreate = async () => {
     setLoading(true)
     setError("")
-    const roomId = await createRoom()
-    setLoading(false)
-    if (!roomId) {
-      setError("创建失败，请重试")
-      return
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      setLoading(false)
+      setError("创建超时（8秒），请检查网络连接后重试")
+    }, 8000)
+    try {
+      const roomId = await createRoom()
+      clearTimeout(timer)
+      if (timedOut) return
+      setLoading(false)
+      if (!roomId) {
+        setError(
+          isCloudReady()
+            ? "创建失败，云端服务异常，请稍后重试"
+            : "创建失败，本地存储不可用，请检查浏览器权限"
+        )
+        return
+      }
+      setCreatedRoom(roomId)
+      setMode("create")
+    } catch (e) {
+      clearTimeout(timer)
+      setLoading(false)
+      console.warn("[RoomSetup] 创建账本失败:", e)
+      setError("创建失败，网络异常，请检查连接后重试")
     }
-    setCreatedRoom(roomId)
-    setMode("create")
   }
 
   const handleJoin = async () => {
@@ -35,16 +54,34 @@ export default function RoomSetup({ onDone }: Props) {
     }
     setLoading(true)
     setError("")
-    const exists = await validateRoom(code)
-    setLoading(false)
-    if (!exists) {
-      setError("房号不存在，请确认后重试")
-      return
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      setLoading(false)
+      setError("验证超时（8秒），请检查网络连接后重试")
+    }, 8000)
+    try {
+      const exists = await validateRoom(code)
+      clearTimeout(timer)
+      if (timedOut) return
+      setLoading(false)
+      if (!exists) {
+        setError(
+          isCloudReady()
+            ? "房号不存在，请确认后重试"
+            : "房号不存在（本地模式仅支持本设备创建的房间）"
+        )
+        return
+      }
+      localStorage.removeItem("couple-ledger-v1")
+      localStorage.setItem("couple-room-id", code)
+      onDone(code)
+    } catch (e) {
+      clearTimeout(timer)
+      setLoading(false)
+      console.warn("[RoomSetup] 加入账本失败:", e)
+      setError("验证失败，网络异常，请检查连接后重试")
     }
-    // 保存到 localStorage 并通知父组件
-    localStorage.removeItem("couple-ledger-v1")
-    localStorage.setItem("couple-room-id", code)
-    onDone(code)
   }
 
   const handleStartUsing = () => {

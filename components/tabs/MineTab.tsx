@@ -1,6 +1,7 @@
 import { THEMES } from "@/lib/constants"
 import type { ThemeKey } from "@/lib/types"
 import type { Ledger } from "@/hooks/useLedger"
+import { useState } from "react"
 
 export function MineTab({
   ledger,
@@ -53,6 +54,8 @@ export function MineTab({
     setCatMgmtOpen,
     cats,
   } = ledger
+
+  const [confirmSwitch, setConfirmSwitch] = useState(false)
 
   return (
     <section className="page active">
@@ -146,14 +149,36 @@ export function MineTab({
           <span className="set-ico s7">关</span><span className="set-label">关于</span>
           <span className="set-val">v1.0</span><span className="set-arrow">›</span>
         </button>
-        <button className="setrow" onClick={() => {
-          localStorage.removeItem("couple-room-id")
-          window.location.reload()
-        }}>
+        <button className="setrow" onClick={() => setConfirmSwitch(true)}>
           <span className="set-ico s5" style={{ background: "var(--out)" }}>↩</span><span className="set-label">换房间</span>
           <span className="set-val">保留数据，重新选择</span><span className="set-arrow">›</span>
         </button>
       </div>
+      {/* 换房间确认弹窗 */}
+      {confirmSwitch && (
+        <>
+          <div className="sheet-mask show" onClick={() => setConfirmSwitch(false)} />
+          <div className="sheet show" style={{ padding: 20, textAlign: "center" }}>
+            <div className="sheet-title">确认换房间？</div>
+            <p style={{ fontSize: 11, color: "var(--text-sub)", margin: "8px 0 16px" }}>
+              本地数据会保留，但将退出当前房间连接
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="px-btn ghost" style={{ flex: 1 }} onClick={() => setConfirmSwitch(false)}>取消</button>
+              <button
+                className="px-btn solid"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  localStorage.removeItem("couple-room-id")
+                  window.location.reload()
+                }}
+              >
+                确认换房间
+              </button>
+            </div>
+          </div>
+        </>
+      )}
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={onImportFile} />
       <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onAvatarFile} />
     </section>

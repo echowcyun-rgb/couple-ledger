@@ -19,6 +19,19 @@ import type { Member, TrendRow } from "@/lib/types"
 
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"]
 
+/** 将 hex 颜色转为 "r,g,b" 字符串，供 rgba() 使用 */
+function hexToRgb(hex: string): string {
+  const m = hex.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i)
+  if (!m) return "96,121,201"
+  return `${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)}`
+}
+
+/** 日历格子金额缩写，防止大数字溢出 */
+function formatCalAmount(total: number): string {
+  if (total >= 1000) return `${(total / 1000).toFixed(1)}k`
+  return yuan(total)
+}
+
 export function TrendCard({
   getData,
   members,
@@ -87,12 +100,12 @@ export function TrendCard({
                   key={day}
                   style={{
                     background: total > 0
-                      ? `rgba(${totalColor === "#3DAE83" ? "61,174,131" : totalColor === "#D96A7E" ? "217,106,126" : "96,121,201"},${bgOpacity})`
+                      ? `rgba(${hexToRgb(totalColor)},${bgOpacity})`
                       : "var(--cream)",
                   }}
                 >
                   <span className="cal-day-num">{day}</span>
-                  {total > 0 && <span className="cal-amount">{yuan(total)}</span>}
+                  {total > 0 && <span className="cal-amount">{formatCalAmount(total)}</span>}
                 </div>
               )
             })}

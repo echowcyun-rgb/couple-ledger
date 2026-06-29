@@ -435,7 +435,6 @@ function sheetRowsFromWorkbook(wb: XLSX.WorkBook): Record<string, unknown>[] {
   const headerRow = findHeaderRowIndex(ws)
   return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
     raw: true,
-    cellDates: true,
     defval: "",
     range: headerRow,
   })

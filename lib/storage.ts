@@ -45,6 +45,14 @@ function emitCloudError(message: string) {
   }
 }
 
+/** 将 Supabase 错误转为用户可理解的提示 */
+function formatCloudSyncError(message: string): string {
+  if (/row-level security|42501/i.test(message)) {
+    return `云同步失败：数据库权限不足（RLS）。请在 Supabase SQL Editor 执行项目根目录 supabase-fix-rls.sql`
+  }
+  return `云同步失败：${message || "请检查网络"}`
+}
+
 function txToRow(tx: Transaction, roomId: string) {
   return {
     id: tx.id,
@@ -114,7 +122,7 @@ export function saveState(state: AppState): void {
     pushTimer = setTimeout(() => {
       pushToCloud(state).catch((e: unknown) => {
         const message = e instanceof Error ? e.message : String(e)
-        emitCloudError(`云同步失败：${message || "请检查网络"}`)
+        emitCloudError(formatCloudSyncError(message))
       })
     }, 1000)
   }

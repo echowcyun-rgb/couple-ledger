@@ -262,6 +262,12 @@ const TYPE_MAP: Record<string, TxType> = {
   支出: "out",
   收入: "in",
   存钱: "save",
+  支: "out",
+  收: "in",
+  expenditure: "out",
+  expense: "out",
+  income: "in",
+  saving: "save",
 }
 
 function getCell(row: Record<string, unknown>, ...keys: string[]): unknown {
@@ -279,6 +285,42 @@ function getCell(row: Record<string, unknown>, ...keys: string[]): unknown {
   return undefined
 }
 
+/** 判断是否为表头行（避免把标题行当数据） */
+function isHeaderLikeRow(row: Record<string, unknown>): boolean {
+  const date = String(getCell(row, "date", "日期", "时间", "交易时间", "交易日期") ?? "").trim()
+  const type = String(getCell(row, "type", "类型", "收支类型", "收/支", "收支") ?? "").trim()
+  const amount = String(getCell(row, "amount", "金额", "数额", "交易金额", "金额(元)") ?? "").trim()
+  return (
+    (date === "日期" || date === "交易时间" || date === "date") &&
+    (type === "类型" || type === "收/支" || type === "type") &&
+    (amount === "金额" || amount === "金额(元)" || amount === "amount")
+  )
+}
+
+/** 扫描前 25 行，定位真正的列名行（兼容微信/支付宝 xlsx 顶部标题行） */
+function findHeaderRowIndex(sheet: XLSX.WorkSheet): number {
+  const ref = sheet["!ref"]
+  if (!ref) return 0
+  const range = XLSX.utils.decode_range(ref)
+  const maxRow = Math.min(range.e.r, range.s.r + 24)
+
+  for (let r = range.s.r; r <= maxRow; r++) {
+    const cells: string[] = []
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r, c })]
+      if (cell?.v != null && cell.v !== "") {
+        cells.push(String(cell.v).trim())
+      }
+    }
+    const joined = cells.join("|")
+    const hasDate = /日期|交易时间|交易日期|date/i.test(joined)
+    const hasAmount = /金额|数额|amount/i.test(joined)
+    const hasType = /类型|收\/支|收支|type/i.test(joined)
+    if (hasDate && hasAmount && hasType) return r
+  }
+  return range.s.r
+}
+
 function parseImportDate(raw: unknown): string {
   if (raw == null || raw === "") return ""
   if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
@@ -291,11 +333,33 @@ function parseImportDate(raw: unknown): string {
     }
   }
   const s = String(raw).trim()
-  const matched = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  // Excel 序列号被读成字符串（raw:false 时常见）
+  if (/^\d{4,5}(\.\d+)?$/.test(s)) {
+    const parsed = XLSX.SSF.parse_date_code(Number(s))
+    if (parsed) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`
+    }
+  }
+  const matched = s.match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/)
   if (matched) {
     return `${matched[1]}-${matched[2].padStart(2, "0")}-${matched[3].padStart(2, "0")}`
   }
+  const isoLike = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (isoLike) {
+    return `${isoLike[1]}-${isoLike[2].padStart(2, "0")}-${isoLike[3].padStart(2, "0")}`
+  }
   return s.slice(0, 10)
+}
+
+function parseImportType(raw: unknown): TxType | "" {
+  const s = String(raw ?? "").trim()
+  if (!s) return ""
+  if (TYPE_MAP[s]) return TYPE_MAP[s]
+  if (TYPE_MAP[s.toLowerCase()]) return TYPE_MAP[s.toLowerCase()]!
+  if (/支出|付款|消费/.test(s)) return "out"
+  if (/收入|收款|转入/.test(s)) return "in"
+  if (/存钱|储蓄/.test(s)) return "save"
+  return ""
 }
 
 function parseImportAmount(raw: unknown): number {
@@ -303,26 +367,33 @@ function parseImportAmount(raw: unknown): number {
   return parseFloat(String(raw).replace(/,/g, "").replace(/[¥￥]/g, "").trim())
 }
 
-/** 解析通用 Excel 账单（支持本应用导出的 xlsx 及常见列名） */
-export function parseGenericXlsx(
-  buffer: ArrayBuffer,
+/** 通用导入格式说明（CSV / xlsx 共用） */
+export const GENERIC_BILL_IMPORT_HINT =
+  "无法识别账单数据，请确保文件包含 日期/类型/金额 列（类型：支出/收入/存钱 或 out/in/save）"
+
+/** 将表格行解析为交易记录（CSV / xlsx 共用） */
+function rowsToTransactions(
+  rows: Record<string, unknown>[],
   members: Member[],
-  cats: Category[] = []
+  cats: Category[]
 ): Transaction[] {
-  const wb = XLSX.read(new Uint8Array(buffer), { type: "array", cellDates: true })
-  const ws = wb.Sheets[wb.SheetNames[0]]
-  if (!ws) return []
-
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { raw: false, defval: "" })
-
   return rows
     .map((row, idx) => {
-      const date = parseImportDate(getCell(row, "date", "日期", "时间", "交易时间", "交易日期"))
-      const rawType = String(getCell(row, "type", "类型", "收支类型") ?? "").trim()
-      const type = TYPE_MAP[rawType] || TYPE_MAP[rawType.toLowerCase()] || ""
-      const amount = parseImportAmount(getCell(row, "amount", "金额", "数额", "交易金额"))
+      if (isHeaderLikeRow(row)) return null
 
-      let categoryKey = String(getCell(row, "categoryKey", "分类", "category", "类别") ?? "").trim()
+      const date = parseImportDate(
+        getCell(row, "date", "日期", "时间", "交易时间", "交易日期", "记账日期")
+      )
+      const type = parseImportType(
+        getCell(row, "type", "类型", "收支类型", "收/支", "收支")
+      )
+      const amount = parseImportAmount(
+        getCell(row, "amount", "金额", "数额", "交易金额", "金额(元)", "金额（元）")
+      )
+
+      let categoryKey = String(
+        getCell(row, "categoryKey", "分类", "category", "类别", "交易分类", "商品说明") ?? ""
+      ).trim()
       if (categoryKey) {
         const byKey = cats.find((c) => c.key === categoryKey)
         const byLabel = cats.find((c) => c.label === categoryKey)
@@ -330,7 +401,9 @@ export function parseGenericXlsx(
         else if (!byKey) categoryKey = ""
       }
 
-      let memberId = String(getCell(row, "memberId", "成员", "member", "经手人") ?? "").trim()
+      let memberId = String(
+        getCell(row, "memberId", "成员", "member", "经手人", "交易对方") ?? ""
+      ).trim()
       if (memberId) {
         const matched = members.find((m) => m.id === memberId || m.name === memberId)
         memberId = matched?.id || memberId
@@ -345,7 +418,7 @@ export function parseGenericXlsx(
         id: `tx_import_${Date.now()}_${idx}`,
         date,
         type,
-        amount,
+        amount: Math.abs(amount),
         categoryKey: categoryKey || (type === "in" ? "salary" : type === "save" ? "save" : "food"),
         memberId,
         note,
@@ -353,4 +426,38 @@ export function parseGenericXlsx(
       }
     })
     .filter(Boolean) as Transaction[]
+}
+
+function sheetRowsFromWorkbook(wb: XLSX.WorkBook): Record<string, unknown>[] {
+  const sheetName = wb.SheetNames.includes("账单") ? "账单" : wb.SheetNames[0]
+  const ws = wb.Sheets[sheetName]
+  if (!ws) return []
+  const headerRow = findHeaderRowIndex(ws)
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+    raw: true,
+    cellDates: true,
+    defval: "",
+    range: headerRow,
+  })
+}
+
+/** 解析通用 CSV 账单（本应用导出 / 标准列名 / 微信支付宝 xlsx 转存） */
+export function parseGenericCsv(
+  content: string,
+  members: Member[],
+  cats: Category[] = []
+): Transaction[] {
+  const text = content.replace(/^\uFEFF/, "")
+  const wb = XLSX.read(text, { type: "string", cellDates: true })
+  return rowsToTransactions(sheetRowsFromWorkbook(wb), members, cats)
+}
+
+/** 解析通用 Excel 账单（.xlsx / .xls） */
+export function parseGenericXlsx(
+  buffer: ArrayBuffer,
+  members: Member[],
+  cats: Category[] = []
+): Transaction[] {
+  const wb = XLSX.read(new Uint8Array(buffer), { type: "array", cellDates: true })
+  return rowsToTransactions(sheetRowsFromWorkbook(wb), members, cats)
 }

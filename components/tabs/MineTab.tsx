@@ -143,7 +143,7 @@ export function MineTab({
         </button>
         <button className="setrow" onClick={() => fileRef.current?.click()}>
           <span className="set-ico s8">入</span><span className="set-label">导入账单</span>
-          <span className="set-val">.xlsx</span><span className="set-arrow">›</span>
+          <span className="set-val">csv / xlsx</span><span className="set-arrow">›</span>
         </button>
         <button className="setrow" onClick={() => toast("俩人记账本 v1.0")}>
           <span className="set-ico s7">关</span><span className="set-label">关于</span>

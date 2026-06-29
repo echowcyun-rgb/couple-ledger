@@ -24,7 +24,9 @@ import {
 } from "@/lib/review"
 import {
   detectSource,
+  GENERIC_BILL_IMPORT_HINT,
   parseAlipayCSV,
+  parseGenericCsv,
   parseGenericXlsx,
   parseWechatCSV,
 } from "@/lib/importers"
@@ -545,72 +547,75 @@ export function useLedger() {
     const file = e.target.files?.[0]
     if (!file) return
     const memberId = members[0]?.id || "wu"
+    const lowerName = file.name.toLowerCase()
 
-    // .csv → 支付宝/微信账单
-    if (file.name.endsWith(".csv")) {
+    const applyGenericImport = (imported: Transaction[]) => {
+      if (imported.length === 0) {
+        toast(GENERIC_BILL_IMPORT_HINT)
+        return
+      }
+      setState((s) => ({ ...s, transactions: [...imported, ...s.transactions] }))
+      toast(`✅ 已导入 ${imported.length} 条账单`)
+    }
+
+    // .csv：优先支付宝/微信专用解析，失败则走通用 CSV
+    if (lowerName.endsWith(".csv")) {
       const reader = new FileReader()
       reader.onload = (ev) => {
         try {
           const text = ev.target!.result as string
           const source = detectSource(text)
 
-          if (source === "unknown") {
-            toast("无法识别账单来源，请确认是支付宝或微信导出的 CSV")
-            return
+          if (source === "alipay" || source === "wechat") {
+            const result =
+              source === "alipay"
+                ? parseAlipayCSV(text, memberId)
+                : parseWechatCSV(text, memberId)
+
+            if (result.transactions.length > 0) {
+              const batch: ImportBatch = {
+                ...result.batch,
+                time: new Date().toISOString(),
+              }
+              setState((s) => ({
+                ...s,
+                transactions: [...result.transactions, ...s.transactions],
+                importBatches: [batch, ...s.importBatches],
+              }))
+              toast(
+                `✅ 已导入 ${result.transactions.length} 条${source === "alipay" ? "支付宝" : "微信"}账单`
+              )
+              return
+            }
           }
 
-          const result =
-            source === "alipay"
-              ? parseAlipayCSV(text, memberId)
-              : parseWechatCSV(text, memberId)
-
-          if (result.transactions.length === 0) {
-            toast(
-              result.unrecognized > 0
-                ? `解析完成，但 ${result.unrecognized} 行无法识别`
-                : "没有识别到可导入的账单记录"
-            )
-            return
-          }
-
-          const batch: ImportBatch = {
-            ...result.batch,
-            time: new Date().toISOString(),
-          }
-
-          setState((s) => ({
-            ...s,
-            transactions: [...result.transactions, ...s.transactions],
-            importBatches: [batch, ...s.importBatches],
-          }))
-          toast(
-            `✅ 已导入 ${result.transactions.length} 条${source === "alipay" ? "支付宝" : "微信"}账单`
-          )
+          // 通用 CSV（本应用导出、标准列名表格等）
+          applyGenericImport(parseGenericCsv(text, members, cats))
         } catch {
           toast("文件解析失败，请确认是有效的 CSV 文件")
         }
       }
-      reader.readAsText(file)
+      reader.readAsText(file, "UTF-8")
       e.target.value = ""
       return
     }
 
     // .xlsx / .xls → 通用 Excel 导入
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        const imported = parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats)
-        if (imported.length === 0) {
-          toast("无法识别文件中的账单数据，请确保xlsx包含 日期/类型/金额 列，类型可选值：支出/收入/存钱(out/in/save)")
-          return
+    if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        try {
+          applyGenericImport(parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats))
+        } catch {
+          toast("文件解析失败，请检查格式")
         }
-        setState((s) => ({ ...s, transactions: [...imported, ...s.transactions] }))
-        toast(`✅ 已导入 ${imported.length} 条账单`)
-      } catch {
-        toast("文件解析失败，请检查格式")
       }
+      reader.readAsArrayBuffer(file)
+      e.target.value = ""
+      return
     }
-    reader.readAsArrayBuffer(file)
+
+    toast("仅支持 .csv / .xlsx / .xls 格式")
     e.target.value = ""
   }, [members, cats, toast])
 

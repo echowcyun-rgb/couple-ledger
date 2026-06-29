@@ -19,11 +19,11 @@ export function HomeTab({
   const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
   const now = new Date()
 
-  // 存钱目标卡片底色（橙/米黄/粉红，与绿色 battle 背景区分）
+  // 存钱目标卡片底色（实心，不受头部遮罩影响）
   const GOAL_CARD_COLORS = [
-    "rgba(240, 160, 60, 0.55)",
-    "rgba(240, 210, 140, 0.55)",
-    "rgba(217, 106, 126, 0.55)",
+    "rgba(240, 160, 60, 0.92)",
+    "rgba(240, 210, 140, 0.92)",
+    "rgba(217, 106, 126, 0.92)",
   ]
 
   return (
@@ -45,11 +45,13 @@ export function HomeTab({
 
       <div className="battle">
         <div className="battle-pattern" aria-hidden="true" />
-        <div className="battle-white-overlay" aria-hidden="true" />
         <div className="battle-inner">
-          <div className="battle-head">
-            <div className="battle-title">★ 存钱大作战</div>
-            <button className="px-btn ghost sm" onClick={() => setGoalOpen(true)}>管理目标</button>
+          <div className="battle-head-area">
+            <div className="battle-white-overlay" aria-hidden="true" />
+            <div className="battle-head">
+              <div className="battle-title">★ 存钱大作战</div>
+              <button className="px-btn ghost sm" onClick={() => setGoalOpen(true)}>管理目标</button>
+            </div>
           </div>
           {goals.length > 0 ? (
             <div className="goal-cards">
@@ -73,7 +75,9 @@ export function HomeTab({
                         <span className="goal-card-emoji">{g.emoji}</span>
                         <span className="goal-card-name">{g.name}</span>
                         {daysLeft !== null && (
-                          <span className="goal-card-days">{daysLeft === 0 ? "今天截止！" : `还剩 ${daysLeft} 天`}</span>
+                          <span className="goal-card-days">
+                            {daysLeft === 0 ? "今天截止 ❗️" : `剩余 ${daysLeft} 天 ❗️`}
+                          </span>
                         )}
                       </div>
                       <div className="hpbar"><div className="hpfill" style={{ width: `${gp}%` }} /></div>

@@ -14,9 +14,10 @@ export function HomeTab({
     | "today"
     | "setGoalOpen"
     | "openRecord"
+    | "openEditGoal"
   >
 }) {
-  const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord } = ledger
+  const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord, openEditGoal } = ledger
   const now = new Date()
 
   // 存钱目标卡片底色（实心，不受头部遮罩影响）
@@ -70,7 +71,21 @@ export function HomeTab({
                     ? Math.max(0, Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
                     : null
                   return (
-                    <div className="goal-card" key={g.id} style={{ background: GOAL_CARD_COLORS[idx] || GOAL_CARD_COLORS[0] }}>
+                    <div
+                      key={g.id}
+                      className="goal-card goal-card-clickable"
+                      style={{ background: GOAL_CARD_COLORS[idx] || GOAL_CARD_COLORS[0] }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`编辑目标 ${g.name}`}
+                      onClick={() => openEditGoal(g.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          openEditGoal(g.id)
+                        }
+                      }}
+                    >
                       <div className="goal-card-head">
                         <span className="goal-card-emoji">{g.emoji}</span>
                         <span className="goal-card-name">{g.name}</span>

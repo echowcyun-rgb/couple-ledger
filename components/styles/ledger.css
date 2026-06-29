@@ -533,6 +533,7 @@
 /* 首页多目标卡片 */
 .app .goal-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .app .goal-card { background: rgba(255,255,255,.08); border: 2px solid var(--ink); border-radius: 10px; padding: 12px; position: relative; z-index: 2; }
+.app .goal-card-clickable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .app .goal-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .app .goal-card-emoji { font-size: 18px; }
 .app .goal-card-name { font-family: var(--font-pixel-cjk), monospace; font-size: 12px; color: #FFFFFF; flex: 1; }

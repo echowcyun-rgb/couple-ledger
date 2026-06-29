@@ -1,4 +1,5 @@
 import { createDefaultState, INIT_CATS, STORAGE_KEY } from "./constants"
+import { normalizeCoupleBg } from "./couple-bg"
 import { supabase, useCloud } from "./supabase"
 import { withRoomLock } from "./sync-lock"
 import { withRetry, withTimeout } from "./sync-utils"
@@ -136,7 +137,7 @@ function parseState(raw: string): AppState {
     activeGoalId: parsed.activeGoalId ?? null,
     cats: mergeCats(parsed.cats?.length ? parsed.cats : defaults.cats),
     theme: parsed.theme || defaults.theme,
-    coupleBg: parsed.coupleBg || "",
+    coupleBg: normalizeCoupleBg(parsed.coupleBg),
     startDate: parsed.startDate || defaults.startDate,
     remindOn: parsed.remindOn ?? true,
     importBatches: parsed.importBatches || [],

@@ -11,6 +11,7 @@ import { RecordSheet } from "@/components/modals/RecordSheet"
 import RoomSetup from "@/components/modals/RoomSetup"
 import { UpdateGoalSheet } from "@/components/modals/UpdateGoalSheet"
 import { EditGoalSheet } from "@/components/modals/EditGoalSheet"
+import { CoupleBgAdjustSheet } from "@/components/modals/CoupleBgAdjustSheet"
 import { FlowTab } from "@/components/tabs/FlowTab"
 import { HomeTab } from "@/components/tabs/HomeTab"
 import { MineTab } from "@/components/tabs/MineTab"
@@ -67,6 +68,12 @@ export default function Page() {
       <EditGoalSheet ledger={ledger} />
       <RecordSheet ledger={ledger} />
       <CategorySheet ledger={ledger} />
+      <CoupleBgAdjustSheet
+        open={ledger.coupleBgAdjustOpen}
+        imageUrl={ledger.pendingCoupleBgUrl}
+        onSave={ledger.saveCoupleBgAdjust}
+        onCancel={ledger.cancelCoupleBgAdjust}
+      />
 
       <Toast show={ledger.toastShow} msg={ledger.toastMsg} />
     </div>

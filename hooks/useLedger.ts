@@ -99,6 +99,9 @@ export function useLedger() {
   const [planBudgetTarget, setPlanBudgetTarget] = useState("")
   const [planSavingsTarget, setPlanSavingsTarget] = useState("")
 
+  const [coupleBgAdjustOpen, setCoupleBgAdjustOpen] = useState(false)
+  const [pendingCoupleBgUrl, setPendingCoupleBgUrl] = useState("")
+
   const fileRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const coupleBgRef = useRef<HTMLInputElement>(null)
@@ -538,10 +541,33 @@ export function useLedger() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => patch({ coupleBg: ev.target!.result as string })
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string
+      if (!url) return
+      setPendingCoupleBgUrl(url)
+      setCoupleBgAdjustOpen(true)
+    }
     reader.readAsDataURL(file)
     e.target.value = ""
-  }, [patch])
+  }, [])
+
+  const saveCoupleBgAdjust = useCallback(
+    (posX: string, posY: string) => {
+      if (!pendingCoupleBgUrl) return
+      patch({
+        coupleBg: { url: pendingCoupleBgUrl, posX, posY },
+      })
+      setCoupleBgAdjustOpen(false)
+      setPendingCoupleBgUrl("")
+      toast("背景已保存")
+    },
+    [pendingCoupleBgUrl, patch, toast]
+  )
+
+  const cancelCoupleBgAdjust = useCallback(() => {
+    setCoupleBgAdjustOpen(false)
+    setPendingCoupleBgUrl("")
+  }, [])
 
   const onImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -688,6 +714,10 @@ export function useLedger() {
     pct,
     cats,
     coupleBg,
+    coupleBgAdjustOpen,
+    pendingCoupleBgUrl,
+    saveCoupleBgAdjust,
+    cancelCoupleBgAdjust,
     coupleDays,
     startDate,
     remindOn,

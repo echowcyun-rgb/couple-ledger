@@ -71,6 +71,12 @@ export interface FlowGroup {
   items: FlowItem[]
 }
 
+export interface CoupleBg {
+  url: string
+  posX: string
+  posY: string
+}
+
 export interface AppState {
   transactions: Transaction[]
   members: Member[]
@@ -78,7 +84,7 @@ export interface AppState {
   activeGoalId: number | null
   cats: Category[]
   theme: ThemeKey
-  coupleBg: string
+  coupleBg: CoupleBg
   startDate: string
   remindOn: boolean
   importBatches: ImportBatch[]

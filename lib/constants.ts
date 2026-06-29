@@ -1,4 +1,5 @@
 import type { Category, Member, ThemeKey } from "./types"
+import { DEFAULT_COUPLE_BG } from "./couple-bg"
 
 export const STORAGE_KEY = "couple-ledger-v1"
 
@@ -53,7 +54,7 @@ export function createDefaultState(): import("./types").AppState {
     activeGoalId: null,
     cats: [...INIT_CATS],
     theme: "mint",
-    coupleBg: "",
+    coupleBg: { ...DEFAULT_COUPLE_BG },
     startDate: new Date().toISOString().slice(0, 10),
     remindOn: true,
     importBatches: [],

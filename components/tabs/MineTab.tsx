@@ -1,4 +1,5 @@
 import { THEMES } from "@/lib/constants"
+import { coupleBgInlineStyle, hasCoupleBg } from "@/lib/couple-bg"
 import type { ThemeKey } from "@/lib/types"
 import type { Ledger } from "@/hooks/useLedger"
 import { useState } from "react"
@@ -67,15 +68,15 @@ export function MineTab({
       </header>
       <div
         className="couple-card"
-        style={coupleBg ? { backgroundImage: `url(${coupleBg})`, backgroundSize: "cover", backgroundPosition: "center" } : {}}
+        style={coupleBgInlineStyle(coupleBg)}
         onClick={() => coupleBgRef.current?.click()}
         role="button"
         aria-label="点击更换背景图"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") coupleBgRef.current?.click() }}
       >
-        {!coupleBg && <div className="couple-pattern" aria-hidden="true" />}
-        {coupleBg && <div className="couple-bg-mask" aria-hidden="true" />}
+        {!hasCoupleBg(coupleBg) && <div className="couple-pattern" aria-hidden="true" />}
+        {hasCoupleBg(coupleBg) && <div className="couple-bg-mask" aria-hidden="true" />}
         <div className="couple-inner couple-inner-new">
           <div className="couple-left">
             <div className="couple-avatars-new">

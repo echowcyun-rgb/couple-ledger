@@ -176,6 +176,19 @@
 .app .rt-v { font-size: 16px; }
 .app .rt-v.in { color: var(--in); }
 .app .rt-v.out { color: var(--out); }
+.app .review-plan-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
+.app .review-plan-save {
+  background: var(--out);
+  color: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+  padding: 8px 14px;
+  font-size: 11px;
+  font-family: var(--font-pixel-cjk), monospace;
+  cursor: pointer;
+}
+.app .review-plan-save:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
 .app .chart-card { padding: 12px; }
 .app .chart-toggles { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .app .seg { display: inline-flex; gap: 4px; background: var(--cream); border: 2px solid var(--ink); border-radius: 9px; padding: 3px; }

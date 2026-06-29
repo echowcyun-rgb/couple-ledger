@@ -96,11 +96,13 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
             <span>还没有找到上月计划，先设定一个吧</span>
           </div>
         )}
-        <div className="rows">
+        <div className="rows review-plan-rows">
           <div className="r"><span>预算目标</span><input className="ga-input" inputMode="decimal" value={planBudgetTarget} onChange={(e) => setPlanBudgetTarget(e.target.value)} placeholder="例如 12000" /></div>
           <div className="r"><span>存钱目标</span><input className="ga-input" inputMode="decimal" value={planSavingsTarget} onChange={(e) => setPlanSavingsTarget(e.target.value)} placeholder="例如 3000" /></div>
         </div>
-        <button className="px-btn solid sm" onClick={saveReviewPlanState}>保存下月计划</button>
+        <div className="review-plan-footer">
+          <button type="button" className="px-btn review-plan-save" onClick={saveReviewPlanState}>保存下月计划</button>
+        </div>
       </div>
       <div className="section-title">收入趋势</div>
       <TrendCard getData={getInTrendData} members={members} totalColor="#3DAE83" refYear={reviewYear} refMonth={reviewMonth} />

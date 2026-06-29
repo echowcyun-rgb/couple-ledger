@@ -33,7 +33,6 @@ export function GoalSheet({
   const {
     goalOpen,
     setGoalOpen,
-    goals,
     activeGoals,
     completedGoals,
     activeGoalId,

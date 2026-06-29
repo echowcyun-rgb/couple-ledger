@@ -35,7 +35,7 @@ export function FlowTab({
   const touchCurrentX = useRef(0)
 
   // 按类型和分类过滤
-  let displayItems = filteredFlow
+  const displayItems = filteredFlow
     .map(g => ({
       ...g,
       items: g.items.filter(i => {

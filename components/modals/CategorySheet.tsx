@@ -38,7 +38,6 @@ export function CategorySheet({
     setNewCatType,
     addCat,
     setRecordOpen,
-    toast,
   } = ledger
 
   const [adding, setAdding] = useState(false)

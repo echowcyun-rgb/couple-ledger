@@ -1,4 +1,4 @@
-export const yuan = (n: number) => "¥" + n.toLocaleString()
+export const yuan = (n: number) => "¥" + Math.round(n)
 
 export function formatFlowDate(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00")

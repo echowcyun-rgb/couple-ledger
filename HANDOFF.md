@@ -1,276 +1,131 @@
-# 项目进度交接文档（第三轮）
+# Cursor 对话交接 - 情侣记账 PWA
 
-> 情侣记账 PWA（移植版）— 供新对话开场使用
-> 更新时间：2026-06-29 21:24
+> 更新时间：2026-06-30
 
----
+## 项目信息
+- 路径：~/Documents/记账app/-pwav1-移植版
+- 分支：feature/review-income-fixes（本地 ahead 22+ commits，含未提交工作区改动）
+- 技术栈：Next.js 16.2.6 + Turbopack + React 19 + TypeScript 5.7 + Tailwind 4 + Supabase + @e965/xlsx + async-mutex
+- 启动命令：`npm run dev`（端口 3006）
+- 生产：`npm run build` → `npm run start`（端口 3005）
+- 主开发目录：`-pwav1-移植版`（不要用旧工作区 `-pwa-0-echowcyun-3364-84738c13`，那个是落后分支）
 
-## 0. ⚠️ 当前最紧急：优化 3 未完成 + build 未验证
+## 已完成的优化（全部 ✅）
 
-**优化 3 代码已改，但未 commit、未 build 验证。** 新对话第一件事是跑 build 确认通过，然后 commit，再继续优化 4。
+### 阶段 0-4 自测+修复
+- xlsx 漏洞修复（@e965/xlsx 替换高危 xlsx）
+- Supabase 同步竞态+超时（async-mutex + withTimeout 10s + withRetry 指数退避）
+- TypeScript 类型错误修复（构建启用 TS 校验）
+- ESLint flat config + vitest 接入（32 tests passed）
+- 5 张表（couples/members/transactions/goals/import_batches）RLS 已全部 DISABLE
 
-### 优化 3 改动状态
+### 优化 1：导入智能分类 + 撤销导入
+- 60 条关键词映射（lib/category-keywords.ts，matchCategoryByKeywords）
+- 导入预览页（ImportPreviewSheet）支持分类下拉 + 未分类二次确认
+- 撤销导入功能（RevertImportSheet，按 batch.ids 删除）
+- 支付宝 CSV GBK/UTF-8 双解码（lib/csv-decode.ts，按中文特征打分）
 
-| 文件 | 改动 | 状态 |
-|------|------|------|
-| `components/tabs/HomeTab.tsx` | 卡片 onClick: `openEditGoal` → `openUpdateGoal`；aria-label 改"更新目标进度" | ✅ 已改 |
-| `components/styles/ledger.css` | `.goal-card-days` font-size 9px→13px + 8 向 text-shadow 黑描边 | ✅ 已改 |
-| `hooks/useLedger.ts` | `saveUpdateGoal` 按金额模式改为累加（`goal.current + num`）；history.amount 记录本次存入值 | ✅ 已改 |
-| `components/modals/UpdateGoalSheet.tsx` | 按金额模式文案"已存金额(元)"→"本次存入(元)" | ✅ 已改 |
+### 优化 2：支付宝 CSV 修复 + 备注截取
+- 动态表头映射（parseAlipayCSV 改为按表头名定位列）
+- noteFromDesc 截取商品说明前 5 字
 
-### 验证状态
+### 优化 3：卡片点击 + 描边字体 + 累加模式
+- 存钱卡片 onClick → openUpdateGoal
+- goal-card-days 13px 描边
+- saveUpdateGoal 从覆盖改累加（goal.current + num）
 
-| 检查 | 结果 |
-|------|------|
-| `npm test` | ✅ 32/32 通过 |
-| `npm run build` | ❌ **未验证**（后台任务被中断，无输出） |
-| `tsc --noEmit` | ❌ **未验证**（后台任务被中断，无输出） |
-| git commit | ❌ **未提交** |
+### 优化 4：爱心居中 + 玫红色
+- couple-heart flex 居中到两个头像之间
+- review-plan-save 改 var(--out) 玫红色（我的页天数后改为嫩黄色 #FFD700 一行排版）
 
-### 新对话第一步：验证 + 提交优化 3
+### 优化 5：底部导航栏像素风图标
+- 10 张像素风 PNG（public/tabbar/，128×128px）
+- TABS 加 imgActive 字段
+- TabBar 双图切换（选中 imgActive / 正常 img）
+- 中间记账按钮：顶部裁切 15%、显示「记账」标签
+- 旧 nav-*.png 已删除（commit `90cb0b2`）
 
-```bash
-# 先清锁和残留进程
-pkill -f "next build"; rm -f ~/Documents/记账app/-pwav1-移植版/.next/lock
+### 优化 6：UI 修复批次
+- 记账按钮绿底删除（.plus 去 background/border/shadow，record-img 44px）
+- 结余计算核查（代码已是 income-expense-savings，console.log 已排查并移除）
+- 存钱卡片字体描边：goal-card-days 改阴影；goal-card-amt/hint 加描边
+- 流水+复盘数据汇总栏删除（flow-summary / review-top 整块删）
+- 数字去逗号（yuan() 去 toLocaleString）
 
-# 直接跑 build（不要 pipe tail）
-cd ~/Documents/记账app/-pwav1-移植版 && npm run build
+### 优化 7：功能增强
+- 导入后可删除项目（ImportPreviewSheet 加 ✕ 按钮 + removeRow）
+- 重复导入提醒（localStorage 存文件指纹 name|size|lastModified，最多 50 条）
+- 导入导出前选成员（MineTab 加成员选择弹窗 + pendingImportMemberRef）
+- 存钱卡片字体调整（hint 放大 + amt 改阴影）
+- 底部导航栏水平对齐（.tabbar align-items flex-end + .tab min-height 56px）
+- 我的界面改版（名字分列头像下方 +「开始记账 x 天啦」一行排版金黄色）
 
-# build 通过后提交
-git add -A
-git commit -m "feat(ui): 首页存钱卡片点击改更新进度 + 还差xx天字体加大描边"
+### 优化 8：存钱激励 + 发薪日提醒 + 成员限制
+- 更新历史可修改（UpdateGoalSheet 加编辑/删除 + editGoalHistory/deleteGoalHistory + GoalHistoryEntry.id，删除后自动重算 current）
+- 发薪日当天字幕「今天是发薪日，记得存一笔哦！」红色加粗 #D32F2F（条框背景保持 cream 不变）
+- 发薪日弹窗居中（sessionStorage 仅在关闭时写入，防 Strict Mode 重复挂载 bug）
+- 存钱恭喜弹窗（4 档随机文案 + celebrate-bounce，样式与发薪日弹窗一致居中）
+- 成员管理最多 2 名（MemberPage 隐藏新增 + addMember 防御检查）
+
+### backlog 修复 ✅
+- 导出 xlsx 空分类显示「未分类」
+- 启动加载慢 + 旧数据残留（cloudSynced 等待云同步；syncFromCloud 清理已删云端交易）
+- 单条 deleteTransaction 补云端删除（deleteCloudTransaction）
+- 成员 2→4 重复 bug（reconcileMembers 去重 + pushToCloud 先删后写 + 上限 2 人）
+- 更新历史编辑：金额输入框与 ✓ 按钮宽度对调
+- `npm run build` + `npm test`（32 passed）验证通过
+
+## 待办 backlog
+- Vercel 实际上线部署（见 `Vercel部署指令.md`）
+
+## 关键文件清单
+- `lib/constants.ts` — TABS 数组配置
+- `lib/types.ts` — 类型定义（GoalHistoryEntry 加 id / Goal / Transaction 等）
+- `lib/format.ts` — yuan() 金额格式化（已去逗号）
+- `lib/supabase.ts` — 云同步（withTimeout/withRetry/upsert/deleteCloudTransaction）
+- `lib/storage.ts` — pushToCloud/syncFromCloud（锁+超时+重试+成员 reconcile）
+- `lib/sync-lock.ts` — withRoomLock（每 roomId 一个 mutex）
+- `lib/sync-utils.ts` — withTimeout/withRetry/isRetryableError
+- `lib/category-keywords.ts` — 60 条关键词映射
+- `lib/csv-decode.ts` — GBK/UTF-8 双解码
+- `lib/couple-bg.ts` — normalizeCoupleBg
+- `hooks/useLedger.ts` — 核心 hook（所有业务逻辑）
+- `components/TabBar.tsx` — 底部导航栏（双图切换）
+- `components/tabs/HomeTab.tsx` — 首页（发薪日字幕）
+- `components/tabs/FlowTab.tsx` — 流水
+- `components/tabs/ReviewTab.tsx` — 复盘
+- `components/tabs/MineTab.tsx` — 我的（含成员选择弹窗）
+- `components/modals/UpdateGoalSheet.tsx` — 更新存钱进度（含历史编辑）
+- `components/modals/ImportPreviewSheet.tsx` — 导入预览（含删除行）
+- `components/modals/RevertImportSheet.tsx` — 撤销导入
+- `components/modals/MemberPage.tsx` — 成员管理（最多 2 人）
+- `components/modals/CoupleBgAdjustSheet.tsx` — 背景图平移
+- `components/styles/ledger.css` — 全局样式
+- `app/page.tsx` — 主页面（发薪日弹窗 + 恭喜弹窗挂载点）
+- `public/tabbar/` — 10 张像素风图标
+- `.env.local` — NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY
+- `next.config.mjs` — Vercel 部署用（已去掉 output: 'export'）
+
+## Supabase 配置
+- URL 和 anon key 在 `.env.local`
+- 5 张表 RLS 已全部 DISABLE
+- room_id=4230 是测试房间
+- import_batches 表有 status 字段（active/reverted）
+
+## 注意事项
+- 主开发目录是 `-pwav1-移植版`，不是旧工作区
+- 沙箱限制可能无法启动 dev server，需用户本地跑 `npm run dev`
+- 不要删除 `.workbuddy/` 目录（WorkBuddy 工作区记忆）
+- `tsconfig.tsbuildinfo` 已在 .gitignore
+- `.env.local` 不会随 git 推送，Vercel 需手动配置环境变量
+
+## commit 建议
+
 ```
+feat: 优化1-8全部完成 + 云同步/backlog/UI修复
 
-如果 build 报错，修完再提交。
-
----
-
-## 1. 项目基本信息
-
-| 项 | 内容 |
-|----|------|
-| **路径** | `~/Documents/记账app/-pwav1-移植版` |
-| **分支** | `feature/review-income-fixes` |
-| **技术栈** | Next.js 16.2.6 · React 19 · TypeScript 5.7 · Tailwind 4 · Supabase JS · async-mutex · @e965/xlsx |
-| **开发启动** | `npm run dev` → `http://127.0.0.1:3006` |
-| **生产启动** | `npm run build` → `npm run start` → 端口 **3005** |
-| **环境变量** | `.env.local`：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| **核心目录** | `app/` `components/` `hooks/useLedger.ts` `lib/supabase.ts` `lib/storage.ts` `lib/sync-utils.ts` `lib/sync-lock.ts` `lib/couple-bg.ts` `lib/category-keywords.ts` `lib/csv-decode.ts` |
-
----
-
-## 2. 已完成阶段（按时间顺序）
-
-### 自测修复
-
-| 阶段 | Commit | 说明 |
-|------|--------|------|
-| 阶段 1｜安全 | `46377ce` | `xlsx` → `@e965/xlsx`，消除高危 CVE |
-| 阶段 2｜同步 | `1877d88` | roomId 级 mutex、10s 超时、指数退避重试、upsert 替代 delete-insert、修 supabase 类型 |
-| 阶段 3｜类型 | `9470c6f` | 删除 `next.config.mjs` 的 `ignoreBuildErrors`，构建启用 TS 校验 |
-| 阶段 3.5｜UI 超时 | 待确认 | RoomSetup 移除独立 setTimeout，loading 跟随底层 withTimeout+withRetry（方案 B） |
-| 阶段 4.1｜ESLint | 待确认 | 接入 ESLint flat config，22 个 error 修复 |
-| 阶段 4.2｜单测 | 待确认 | vitest 单测，sync-utils / sync-lock / supabase mock |
-
-> **注意：** 阶段 3.5 / 4.1 / 4.2 之前说"本地未提交"，新对话开场先 `git status` 确认。如果没提交，先提交再继续。
-
-### UI 优化第一批
-
-| 优化 | Commit | 说明 |
-|------|--------|------|
-| 分类管理 bug | `549ec10` | 单输入框、下滑手势仅绑 grab 条 |
-| 首页存钱遮罩/字体 | `87681ad` | 遮罩仅标题区、剩余时间白字加粗 ❗️ |
-| 卡片点击编辑 | `590c18c` | 首页 goal-card → `openEditGoal` → `EditGoalSheet`（优化 3 已改为 `openUpdateGoal`） |
-| 复盘下月计划 | `1d9a488` | 间距 16px、保存按钮 `var(--out)` 红色、右对齐 |
-| 背景图平移 | `cf375ea` | `coupleBg` 扩展 `{url,posX,posY}` + `CoupleBgAdjustSheet` |
-
-### UI 优化第二批（导入功能增强）
-
-| 优化 | Commit | 说明 |
-|------|--------|------|
-| 导入智能分类 | `5d2d4a9` | 60 条关键词映射 + `ImportPreviewSheet` 预览 + 未分类二次确认 |
-| 支付宝 CSV 修复 | `d48d6b2` | GBK 解码 + 动态表头映射，修复"未识别类型" |
-| 备注截取 | `7656afb` | `noteFromDesc` 截取商品说明前 5 字 |
-| 撤销导入 | `4b3e06c` | `RevertImportSheet` + 批量删 transactions + 标记 reverted |
-| **优化 3｜卡片更新进度** | **未提交** | 卡片点击改 `openUpdateGoal` + 字体加大描边 + 累加模式（见第 0 节） |
-
----
-
-## 3. 关键决策记录
-
-### Supabase upsert onConflict
-
-| 表 | onConflict |
-|----|------------|
-| goals | `room_id,id` |
-| members | `room_id,id` |
-| import_batches | `room_id,time` |
-| transactions | `id`（未改） |
-
-### 锁 / 超时 / 重试
-
-| 配置 | 值 / 实现 |
-|------|-----------|
-| 锁 | `async-mutex`，每 `roomId` 一把，`withRoomLock`（`lib/sync-lock.ts`） |
-| 超时 | `CLOUD_TIMEOUT_MS = 10000`（`lib/sync-utils.ts`） |
-| 重试 | `withRetry`，`retries: 2`，`baseDelay: 500`，指数退避 + jitter |
-| push 防抖 | `saveState` 仍 **1s**（未改） |
-
-### withRetry 错误分类
-
-- **重试**：网络/超时、`RETRYABLE_POSTGREST_CODES` 白名单（08xxx、死锁、PGRST000/502-504）、message 含 5xx
-- **不重试**：`PGRST1–4xx`、`23xxx` 约束、`42501` RLS、`PGRST116`、其它业务错误
-
-### UI / 功能决策
-
-| 项 | 决策 |
-|----|------|
-| xlsx 替换 | `@e965/xlsx`（drop-in） |
-| 背景图调整 | 方案 A（平移 + 滑块，无新依赖） |
-| UI 超时（RoomSetup） | 方案 B（删除独立超时，跟底层 withTimeout+withRetry） |
-| 导入分类未命中 | categoryKey 存 `""`，UI 显示"未分类"，不瞎猜 |
-| 撤销导入 | 物理删除 transactions，importBatches 标记 `status: "reverted"` 保留审计 |
-| **优化 3 卡片点击** | 改为 `openUpdateGoal`（复用 UpdateGoalSheet，不新建） |
-| **优化 3 字体** | 13px + 8 向 text-shadow 黑描边 |
-| **优化 3 更新语义** | 按金额模式改为**累加**（`goal.current + num`），百分比模式不变 |
-
----
-
-## 4. 当前代码状态
-
-| 检查 | 结果 |
-|------|------|
-| `tsc --noEmit` | ⚠️ 未验证（优化 3 改动后未跑） |
-| `npm run build` | ⚠️ 未验证（后台任务中断） |
-| `npm test` | ✅ 32/32 通过 |
-| `eslint .` | ⚠️ 未验证 |
-| git 工作区 | ⚠️ 优化 3 改动未提交，可能有阶段 3.5/4 改动也未提交 |
-
----
-
-## 5. Supabase 配置变更（全部已在控制台执行）
-
-### UNIQUE 约束
-
-```sql
-ALTER TABLE import_batches ADD CONSTRAINT import_batches_room_time_unique UNIQUE (room_id, time);
-ALTER TABLE goals ADD CONSTRAINT goals_room_id_id_unique UNIQUE (room_id, id);
-ALTER TABLE members ADD CONSTRAINT members_room_id_id_unique UNIQUE (room_id, id);
+- 导入智能分类/撤销/成员选择/像素风导航
+- 存钱激励/发薪日弹窗/恭喜弹窗/成员上限2人
+- 云同步修复：deleteTransaction/deleteCloud、reconcileMembers、cloudSynced
+- 弹窗居中、发薪日条框样式、导出未分类
 ```
-
-### 列变更
-
-```sql
-ALTER TABLE goals ADD COLUMN "completedAt" TEXT DEFAULT NULL;
-ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
-ALTER TABLE import_batches ADD CONSTRAINT import_batches_status_check CHECK (status IN ('active', 'reverted'));
-```
-
-### RLS（5 张表全部关闭）
-
-```sql
-ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE import_batches DISABLE ROW LEVEL SECURITY;
-ALTER TABLE goals DISABLE ROW LEVEL SECURITY;
-ALTER TABLE members DISABLE ROW LEVEL SECURITY;
-ALTER TABLE couples DISABLE ROW LEVEL SECURITY;
-```
-
-**验证方法：**
-```sql
-SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('transactions','import_batches','goals','members','couples');
--- 全部应为 false
-```
-
-### 相关 SQL 文件（项目根目录）
-
-- `supabase-migration.sql` — 建表
-- `supabase-fix-rls.sql` — 关 RLS
-- `supabase-add-deadline.sql` — goals.deadline
-
----
-
-## 6. 遗留问题清单
-
-| # | 问题 | 阻塞 | 建议时机 |
-|---|------|------|----------|
-| 1 | **优化 3 未提交未验证** | 🔴 是 | 新对话第一件事 |
-| 2 | 阶段 3.5/4.1/4.2 可能未提交 | 🟡 待确认 | 新对话开场 git status |
-| 3 | 优化 4：我的页爱心居中 + 右侧玫红色 | 否 | 优化 3 完成后 |
-| 4 | 优化 5：底部导航栏图标替换图片 | 否 | 等用户提供素材 |
-| 5 | 已有背景图无法重新调整位置 | 否 | UI 小需求 |
-| 6 | coupleBg 未同步 Supabase | 否 | 多设备需求时 |
-| 7 | 启动加载慢 + 旧数据（诊断报告已有） | 否 | 产品评估后 |
-| 8 | 单条 deleteTransaction 只删本地不删云端 | 否 | backlog |
-| 9 | 撤销云端失败后 transactions 不会自动重删 | 否 | backlog |
-| 10 | 导出 xlsx 空分类显示空白列 | 否 | backlog |
-| 11 | fullPush 无 room 锁（当前无调用方） | 否 | 用到时再修 |
-| 12 | npm audit 仍有 postcss/next 间接 moderate | 否 | 依赖升级时 |
-| 13 | RLS 开发阶段用 DISABLE，上线前需补 policy | 否 | 上线前 |
-
----
-
-## 7. 下一步待办（新对话执行顺序）
-
-1. **🔴 优先：验证 + 提交优化 3**
-   - `pkill -f "next build"; rm -f .next/lock`
-   - `npm run build`（不要 pipe tail）
-   - build 通过 → `git add -A && git commit`
-   - build 失败 → 修 → 再 build
-
-2. **确认工作区状态**
-   - `git status` 看有没有阶段 3.5/4.1/4.2 未提交的改动
-   - 有就一并提交
-
-3. **优化 4：我的页置顶模块**
-   - 爱心放到两个头像之间（flex 三段式或绝对定位居中）
-   - 右侧文字改玫红色 `var(--out)`（#D96A7E）
-
-4. **优化 5：底部导航栏图标替换**
-   - 先输出素材需求清单（几张图、尺寸、格式、命名）
-   - 等用户提供图片后再实现
-
-5. **🧹 项目文件清理（先扫描列清单，确认后再删）**
-   - 扫描项目根目录,列出所有 `.md` / `.sql` / 临时文件 / 备份文件
-   - 判断哪些是废弃的(过期的修复记录、临时草稿、重复文档)
-   - **不要直接删**,先输出清单给我确认:
-     - 文件名 + 大小 + 最后修改时间 + 判断(保留/删除) + 理由
-   - 确认要删的文件,用 `git rm` 或移到 `.trash/` 目录,不要直接 `rm`
-   - **保留的文件**:HANDOFF.md / README.md / 所有 supabase-*.sql / .cursor-guide.md / docs/ / Vercel操作指南.md(除非确认废弃)
-   - **可能废弃的**:fix-all.md / 其他修复过程文档 / 临时测试文件
-
-6. **backlog（不急）**
-   - 导出 xlsx 空分类显示"未分类"
-   - 启动加载慢 + 旧数据问题评估
-   - 单条 deleteTransaction 补云端删除
-
----
-
-## 8. 真实账单文件格式（供后续参考）
-
-### 支付宝 CSV
-
-- 编码 **GBK**，文件名 `支付宝交易明细*.csv`
-- 18 行表头，12 列：交易时间/交易分类/交易对方/对方账号/商品说明/收/支/金额/收/付款方式/交易状态/交易订单号/商家订单号/备注
-- 前 17 行是说明文字需跳过
-- 解析已修复：`lib/csv-decode.ts` GBK/UTF-8 双解码 + 动态表头映射
-
-### 微信 XLSX
-
-- 标准 xlsx（UTF-8），文件名 `微信支付账单流水文件*.xlsx`
-- 18 行表头，11 列：交易时间/交易类型/交易对方/商品/收/支/金额(元)/支付方式/当前状态/交易单号/商户单号/备注
-- 交易时间是 datetime 类型
-
----
-
-## 新对话开场建议
-
-直接粘贴本文档，并说明：
-
-> 这是上一轮对话的进度交接，请阅读后先完成优化 3（验证 build + 提交），然后继续优化 4。
-
-**关键提醒：**
-- 跑 build 不要 pipe tail，直接跑
-- 先 `pkill -f "next build"` 清残留进程
-- 先 `git status` 确认工作区
-- 优化 3 方案已确认，代码已改，只需验证 + 提交，不要重新走方案确认流程

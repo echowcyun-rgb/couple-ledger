@@ -50,6 +50,10 @@ export function ImportPreviewSheet({
     )
   }
 
+  function removeRow(id: string) {
+    setRows((prev) => prev.filter((t) => t.id !== id))
+  }
+
   function handleConfirmClick() {
     if (rows.length === 0) return
     if (uncategorizedCount > 0) {
@@ -90,6 +94,9 @@ export function ImportPreviewSheet({
         </div>
 
         <div className="import-preview-table-wrap">
+          {rows.length === 0 ? (
+            <div className="import-preview-empty">已删除所有项目，可点击取消退出</div>
+          ) : (
           <table className="import-preview-table">
             <thead>
               <tr>
@@ -97,6 +104,7 @@ export function ImportPreviewSheet({
                 <th>金额</th>
                 <th>分类</th>
                 <th>商品说明</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -122,10 +130,21 @@ export function ImportPreviewSheet({
                   <td className="import-preview-note" title={t.note}>
                     {t.note || "—"}
                   </td>
+                  <td className="import-preview-action">
+                    <button
+                      type="button"
+                      className="import-preview-del"
+                      aria-label="删除此行"
+                      onClick={() => removeRow(t.id)}
+                    >
+                      ✕
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         <div className="import-preview-actions">

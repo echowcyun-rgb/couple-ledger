@@ -76,6 +76,27 @@ function mergeCats(saved: AppState["cats"]) {
   return merged
 }
 
+const MAX_MEMBERS = 2
+
+/** 合并云端与本地成员，按 id 去重、按名称去重，最多 2 人 */
+function reconcileMembers(cloud: Member[], local: Member[]): Member[] {
+  const cloudIds = new Set(cloud.map((m) => m.id))
+  const localOnly = local.filter((m) => !cloudIds.has(m.id))
+  const merged = [...cloud, ...localOnly]
+
+  const seenIds = new Set<string>()
+  const seenNames = new Set<string>()
+  const out: Member[] = []
+  for (const m of merged) {
+    if (seenIds.has(m.id) || seenNames.has(m.name)) continue
+    seenIds.add(m.id)
+    seenNames.add(m.name)
+    out.push(m)
+    if (out.length >= MAX_MEMBERS) break
+  }
+  return out
+}
+
 function emitCloudError(message: string) {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("ledger-cloud-error", { detail: message }))
@@ -132,7 +153,7 @@ function parseState(raw: string): AppState {
   const defaults = createDefaultState()
   return {
     transactions: parsed.transactions || [],
-    members: parsed.members?.length ? parsed.members : defaults.members,
+    members: reconcileMembers([], parsed.members?.length ? parsed.members : defaults.members),
     goals: (parsed.goals || []).map(migrateGoal),
     activeGoalId: parsed.activeGoalId ?? null,
     cats: mergeCats(parsed.cats?.length ? parsed.cats : defaults.cats),
@@ -221,7 +242,8 @@ async function pushToCloud(state: AppState): Promise<void> {
   }
 
   if (state.members.length > 0) {
-    const memberRows = state.members.map((m) => ({
+    const capped = state.members.slice(0, MAX_MEMBERS)
+    const memberRows = capped.map((m) => ({
       id: m.id,
       room_id: roomId,
       name: m.name,
@@ -229,8 +251,16 @@ async function pushToCloud(state: AppState): Promise<void> {
       gender: m.gender,
       payday: m.payday,
     }))
+    // 先删后写，避免云端残留旧 id 成员导致同步后变成 4 人
+    await runSupabaseVoid(() =>
+      supabase!.from("members").delete().eq("room_id", roomId)
+    )
     await runSupabaseVoid(() =>
       supabase!.from("members").upsert(memberRows, { onConflict: "room_id,id" })
+    )
+  } else {
+    await runSupabaseVoid(() =>
+      supabase!.from("members").delete().eq("room_id", roomId)
     )
   }
 
@@ -304,6 +334,15 @@ export async function syncFromCloud(): Promise<number> {
           localMap.set(id, ct)
         }
 
+        // 本地已同步但云端已删除的记录应移除，避免旧数据残留
+        const cloudIds = new Set(cloudTxns.map((t) => t.id))
+        for (const id of [...localMap.keys()]) {
+          const lt = localMap.get(id)!
+          if (lt.synced && !cloudIds.has(id)) {
+            localMap.delete(id)
+          }
+        }
+
         local.transactions = Array.from(localMap.values()).sort(
           (a, b) => b.createdAt - a.createdAt
         )
@@ -322,11 +361,7 @@ export async function syncFromCloud(): Promise<number> {
           payday: r.payday ?? 10,
         }))
 
-        const localMembers = new Map(local.members.map((m) => [m.id, m]))
-        for (const cm of cloudMembers) {
-          localMembers.set(cm.id, cm)
-        }
-        local.members = Array.from(localMembers.values())
+        local.members = reconcileMembers(cloudMembers, local.members)
       }
 
       const goalData = await runSupabaseQuery(() =>

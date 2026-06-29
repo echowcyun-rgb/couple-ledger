@@ -97,11 +97,11 @@ export function HomeTab({
                       </div>
                       <div className="hpbar"><div className="hpfill" style={{ width: `${gp}%` }} /></div>
                       <div className="goal-card-amt">
-                        <span className="cur">¥{g.current.toLocaleString()}</span>
-                        <span className="tgt">/ ¥{g.target.toLocaleString()}</span>
+                        <span className="cur">¥{g.current}</span>
+                        <span className="tgt">/ ¥{g.target}</span>
                       </div>
                       <div className="goal-card-hint">
-                        {gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${(g.target - g.current).toLocaleString()} · ${gp}%`}
+                        {gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${g.target - g.current} · ${gp}%`}
                       </div>
                     </div>
                   )
@@ -140,7 +140,7 @@ export function HomeTab({
                     <span className="pay-mname">{m.name}</span>
                     {mIsPayday ? (
                       <>
-                        <span className="ptext">今天发工资啦！</span>
+                        <span className="ptext payday-today-text">今天是发薪日，记得存一笔哦！</span>
                         <button className="px-btn solid sm" style={{ marginLeft: "auto" }} onClick={openRecord}>记一笔 ▶</button>
                       </>
                     ) : (

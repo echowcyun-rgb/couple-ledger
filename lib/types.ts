@@ -12,6 +12,7 @@ export interface Member {
 }
 
 export interface GoalHistoryEntry {
+  id?: string
   date: string
   amount: number
   note: string

@@ -20,6 +20,8 @@ export function UpdateGoalSheet({
     | "setUpdateMemberId"
     | "members"
     | "saveUpdateGoal"
+    | "editGoalHistory"
+    | "deleteGoalHistory"
   >
 }) {
   const {
@@ -36,9 +38,14 @@ export function UpdateGoalSheet({
     setUpdateMemberId,
     members,
     saveUpdateGoal,
+    editGoalHistory,
+    deleteGoalHistory,
   } = ledger
 
   const [saving, setSaving] = useState(false)
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null)
+  const [editHistAmount, setEditHistAmount] = useState("")
+  const [editHistNote, setEditHistNote] = useState("")
   const swipe = useSheetSwipe(() => setUpdateGoalId(null), updateGoalId !== null)
 
   function handleSave() {
@@ -63,7 +70,7 @@ export function UpdateGoalSheet({
             <div className="sheet-grab" aria-hidden="true" />
             <div className="sheet-title">更新「{updateGoal.name}」进度</div>
             <div className="upd-meta">
-              目标 ¥{updateGoal.target.toLocaleString()} · 当前已存 ¥{updateGoal.current.toLocaleString()} · 完成 {Math.min(100, Math.round((updateGoal.current / updateGoal.target) * 100))}%
+              目标 ¥{updateGoal.target} · 当前已存 ¥{updateGoal.current} · 完成 {Math.min(100, Math.round((updateGoal.current / updateGoal.target) * 100))}%
             </div>
             <div className="upd-field-label">经手人</div>
             <div className="rec-members">
@@ -94,7 +101,7 @@ export function UpdateGoalSheet({
             />
             {updateMode === "amount" && updateAmount && !Number.isNaN(Number(updateAmount)) && Number(updateAmount) > 0 && (
               <div className="upd-field-hint">
-                更新后将达到 ¥{(updateGoal.current + Number(updateAmount)).toLocaleString()}
+                更新后将达到 ¥{updateGoal.current + Number(updateAmount)}
               </div>
             )}
             <div className="upd-field-label">备注（选填）</div>
@@ -106,13 +113,71 @@ export function UpdateGoalSheet({
             {updateGoal.history.length > 0 && (
               <div className="upd-history">
                 <div className="upd-h-title">更新历史</div>
-                {updateGoal.history.map((h, i) => (
-                  <div className="upd-h-row" key={i}>
-                    <span className="upd-h-date">{h.date}</span>
-                    <span className="upd-h-note">{h.note}</span>
-                    <span className="upd-h-amt">¥{h.amount.toLocaleString()}</span>
-                  </div>
-                ))}
+                {updateGoal.history.map((h, i) => {
+                  const hid = h.id || `${h.date}_${h.amount}_${h.note}`
+                  const isEditing = editingHistoryId === hid
+                  return (
+                    <div className="upd-h-row" key={hid || i}>
+                      {isEditing ? (
+                        <>
+                          <span className="upd-h-date">{h.date}</span>
+                          <input
+                            className="upd-h-input-amt"
+                            type="number"
+                            inputMode="decimal"
+                            value={editHistAmount}
+                            onChange={(e) => setEditHistAmount(e.target.value)}
+                            aria-label="金额"
+                          />
+                          <input
+                            className="upd-h-input-note"
+                            value={editHistNote}
+                            onChange={(e) => setEditHistNote(e.target.value)}
+                            aria-label="备注"
+                          />
+                          <button
+                            className="upd-h-btn save"
+                            onClick={() => {
+                              editGoalHistory(updateGoal.id, hid, {
+                                amount: Number(editHistAmount) || 0,
+                                note: editHistNote,
+                              })
+                              setEditingHistoryId(null)
+                            }}
+                          >✓</button>
+                          <button
+                            className="upd-h-btn cancel"
+                            onClick={() => setEditingHistoryId(null)}
+                          >✕</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="upd-h-date">{h.date}</span>
+                          <span className="upd-h-note">{h.note}</span>
+                          <span className="upd-h-amt">¥{h.amount}</span>
+                          <button
+                            className="upd-h-btn edit"
+                            onClick={() => {
+                              setEditingHistoryId(hid)
+                              setEditHistAmount(String(h.amount))
+                              setEditHistNote(h.note)
+                            }}
+                            aria-label="编辑"
+                          >✎</button>
+                          <button
+                            className="upd-h-btn del"
+                            onClick={() => {
+                              if (confirm(`删除这条历史？\n${h.date} ¥${h.amount} ${h.note}\n删除后存钱总额会重新计算`)) {
+                                deleteGoalHistory(updateGoal.id, hid)
+                              }
+                            }}
+                            aria-label="删除"
+                          >🗑</button>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </>

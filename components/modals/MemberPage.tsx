@@ -63,7 +63,9 @@ export function MemberPage({
       <div className="fp-header">
         <button className="fp-back" onClick={() => { setMemberPageOpen(false); setEditingMember(null) }}>‹ 返回</button>
         <div className="fp-title">成员管理</div>
-        <button className="fp-action" onClick={addMember}>+ 新增</button>
+        {members.length < 2 && (
+          <button className="fp-action" onClick={addMember}>+ 新增</button>
+        )}
       </div>
       <div className="fp-body">
         {editingMember ? (

@@ -6,7 +6,7 @@ import { SYS_AVATARS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud } from "@/lib/storage"
-import { deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
+import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
   getInTrendData,
@@ -38,6 +38,7 @@ import type {
   AppState,
   Gender,
   Goal,
+  GoalHistoryEntry,
   ImportBatch,
   Member,
   Tab,
@@ -46,8 +47,39 @@ import type {
   TxType,
 } from "@/lib/types"
 
+function generateCelebrateMessages(amount: number, current: number, target: number): string {
+  const isComplete = current >= target
+
+  const bigAmountMsgs = [
+    `哇！¥${amount} 这笔太给力了，离目标又近一大步 🚀`,
+    `¥${amount} 入账！这存钱速度，今年稳了 💪`,
+    `大额存入 ¥${amount}！你这是要提前完成目标啊 🎯`,
+  ]
+  const midAmountMsgs = [
+    `又存了 ¥${amount}，积少成多，未来可期 ✨`,
+    `¥${amount} 到账！每一笔都在为梦想添砖加瓦 🧱`,
+    `稳扎稳打 ¥${amount}，这节奏很可以 📈`,
+  ]
+  const smallAmountMsgs = [
+    `¥${amount} 也是爱！坚持就是胜利 🌱`,
+    `小钱也是钱，¥${amount} 已存入，继续加油 💰`,
+    `哪怕 ¥${amount}，也在向目标前进 🐾`,
+  ]
+  const completeMsgs = [
+    `🎉 恭喜！「目标」已达成！太棒了！`,
+    `🏆 目标完成！你的坚持终于开花结果！`,
+    `🎊 100% 达成！这一刻值得庆祝！开瓶香槟吧！`,
+  ]
+
+  if (isComplete) return completeMsgs[Math.floor(Math.random() * completeMsgs.length)]
+  if (amount >= 1000) return bigAmountMsgs[Math.floor(Math.random() * bigAmountMsgs.length)]
+  if (amount >= 100) return midAmountMsgs[Math.floor(Math.random() * midAmountMsgs.length)]
+  return smallAmountMsgs[Math.floor(Math.random() * smallAmountMsgs.length)]
+}
+
 export function useLedger() {
   const [hydrated, setHydrated] = useState(false)
+  const [cloudSynced, setCloudSynced] = useState(() => !useCloud)
   const [tab, setTab] = useState<Tab>("home")
   const [state, setState] = useState<AppState>(() => loadState())
 
@@ -108,11 +140,16 @@ export function useLedger() {
   const [importPreviewSource, setImportPreviewSource] = useState<ImportBatch["source"]>("generic")
   const [importPreviewTransactions, setImportPreviewTransactions] = useState<Transaction[]>([])
   const [importPreviewRecorder, setImportPreviewRecorder] = useState("")
+  const [importPreviewFileFingerprint, setImportPreviewFileFingerprint] = useState("")
 
   const [revertImportOpen, setRevertImportOpen] = useState(false)
   const [revertImportLoading, setRevertImportLoading] = useState(false)
 
+  const [celebrateOpen, setCelebrateOpen] = useState(false)
+  const [celebrateMsg, setCelebrateMsg] = useState("")
+
   const fileRef = useRef<HTMLInputElement>(null)
+  const pendingImportMemberRef = useRef<string>("")
   const avatarRef = useRef<HTMLInputElement>(null)
   const coupleBgRef = useRef<HTMLInputElement>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -140,23 +177,28 @@ export function useLedger() {
     return () => window.removeEventListener("ledger-cloud-error", onCloudError)
   }, [toast])
 
-  // 初始化后从云同步（用户无感）
+  // 初始化后从云同步，完成后再展示主界面，避免旧本地数据闪现
   useEffect(() => {
     if (!hydrated) return
+    if (!useCloud) {
+      setCloudSynced(true)
+      return
+    }
+    const roomId = typeof window !== "undefined" ? localStorage.getItem("couple-room-id") : null
+    if (!roomId) {
+      setCloudSynced(true)
+      return
+    }
     syncFromCloud()
       .then((count) => {
-        if (count > 0) {
-          setState(loadState())
-          toast(`☁️ 已同步 ${count} 条云端记录`)
-        } else {
-          const st = loadState()
-          if (st.transactions.length > 0) saveState(st)
-        }
+        setState(loadState())
+        if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
       })
       .catch((e: unknown) => {
         const message = e instanceof Error ? e.message : String(e)
         toast(`云同步失败：${message || "请检查网络"}`)
       })
+      .finally(() => setCloudSynced(true))
   }, [hydrated, toast])
 
   useEffect(() => {
@@ -364,14 +406,29 @@ export function useLedger() {
       transactions: s.transactions.filter((tx) => tx.id !== id),
     }))
     toast("已删除账单")
-  }, [toast])
 
-  const exportTransactionsXlsx = useCallback(() => {
-    const rows = transactions.map((t) => ({
+    const roomId =
+      state.roomId ||
+      (typeof window !== "undefined" ? localStorage.getItem("couple-room-id") || "" : "")
+
+    if (useCloud && roomId) {
+      withRoomLock(roomId, () => deleteCloudTransaction(id, roomId)).catch(() => {
+        toast("删除已生效，云同步失败，稍后自动重试")
+      })
+    }
+  }, [toast, state.roomId])
+
+  const exportTransactionsXlsx = useCallback((memberId?: string) => {
+    const targetMemberId = memberId || members[0]?.id || ""
+    const filtered = targetMemberId
+      ? transactions.filter((t) => t.memberId === targetMemberId)
+      : transactions
+    const memberName = members.find((m) => m.id === targetMemberId)?.name || "全部"
+    const rows = filtered.map((t) => ({
       日期: t.date,
       类型: t.type === "out" ? "支出" : t.type === "in" ? "收入" : "存钱",
       金额: t.amount,
-      分类: cats.find((c) => c.key === t.categoryKey)?.label || t.categoryKey,
+      分类: cats.find((c) => c.key === t.categoryKey)?.label || (t.categoryKey || "未分类"),
       经手人: members.find((m) => m.id === t.memberId)?.name || t.memberId,
       备注: t.note || "",
     }))
@@ -383,7 +440,7 @@ export function useLedger() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `账单_${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.download = `账单_${memberName}_${new Date().toISOString().slice(0, 10)}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
     toast("已导出账单 xlsx")
@@ -493,7 +550,7 @@ export function useLedger() {
               ...x,
               current: newCurrent,
               history: [
-                { date: todayStr, amount: historyAmount, note: historyNote, memberId: updateMemberId },
+                { id: `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, date: todayStr, amount: historyAmount, note: historyNote, memberId: updateMemberId },
                 ...x.history,
               ].slice(0, 20),
             }
@@ -501,8 +558,40 @@ export function useLedger() {
       ),
     }))
     setUpdateGoalId(null)
-    toast("进度已更新")
+    const msgs = generateCelebrateMessages(historyAmount, newCurrent, updateGoal.target)
+    setCelebrateMsg(msgs)
+    setCelebrateOpen(true)
   }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, updateMemberId, toast])
+
+  const editGoalHistory = useCallback((goalId: number, historyId: string, patchHist: Partial<Pick<GoalHistoryEntry, "amount" | "note">>) => {
+    setState((s) => ({
+      ...s,
+      goals: s.goals.map((g) => {
+        if (g.id !== goalId) return g
+        const newHistory = g.history.map((h) => {
+          const hid = h.id || `${h.date}_${h.amount}_${h.note}`
+          return hid === historyId ? { ...h, ...patchHist, id: h.id || hid } : h
+        })
+        const newCurrent = newHistory.reduce((sum, h) => sum + (h.amount > 0 ? h.amount : 0), 0)
+        return { ...g, history: newHistory, current: newCurrent }
+      }),
+    }))
+  }, [])
+
+  const deleteGoalHistory = useCallback((goalId: number, historyId: string) => {
+    setState((s) => ({
+      ...s,
+      goals: s.goals.map((g) => {
+        if (g.id !== goalId) return g
+        const newHistory = g.history.filter((h) => {
+          const hid = h.id || `${h.date}_${h.amount}_${h.note}`
+          return hid !== historyId
+        })
+        const newCurrent = newHistory.reduce((sum, h) => sum + (h.amount > 0 ? h.amount : 0), 0)
+        return { ...g, history: newHistory, current: newCurrent }
+      }),
+    }))
+  }, [])
 
   const addCat = useCallback(() => {
     const label = newCatLabel.trim()
@@ -543,6 +632,10 @@ export function useLedger() {
   }, [editingMember, editName, editGender, editPayday, editAvatar, members, patch, toast])
 
   const addMember = useCallback(() => {
+    if (members.length >= 2) {
+      toast("最多只能添加 2 名成员哦")
+      return
+    }
     const id = `m_${Date.now()}`
     const defaultName = members.length === 0 ? "我" : `成员${members.length + 1}`
     patch({
@@ -601,7 +694,7 @@ export function useLedger() {
     setPendingCoupleBgUrl("")
   }, [])
 
-  const openImportPreview = useCallback((result: ImportResult, recorder: string) => {
+  const openImportPreview = useCallback((result: ImportResult, recorder: string, fileFingerprint: string) => {
     if (result.transactions.length === 0) {
       toast(GENERIC_BILL_IMPORT_HINT)
       return
@@ -609,6 +702,7 @@ export function useLedger() {
     setImportPreviewSource(result.batch.source)
     setImportPreviewTransactions(result.transactions)
     setImportPreviewRecorder(recorder)
+    setImportPreviewFileFingerprint(fileFingerprint)
     setImportPreviewOpen(true)
   }, [toast])
 
@@ -616,6 +710,7 @@ export function useLedger() {
     setImportPreviewOpen(false)
     setImportPreviewTransactions([])
     setImportPreviewRecorder("")
+    setImportPreviewFileFingerprint("")
   }, [])
 
   const confirmImportPreview = useCallback((imported: Transaction[]) => {
@@ -638,9 +733,17 @@ export function useLedger() {
         : importPreviewSource === "wechat"
           ? "微信"
           : "通用"
+
+    if (importPreviewFileFingerprint) {
+      const importedFingerprints = JSON.parse(localStorage.getItem("imported-files") || "[]") as string[]
+      importedFingerprints.push(importPreviewFileFingerprint)
+      if (importedFingerprints.length > 50) importedFingerprints.shift()
+      localStorage.setItem("imported-files", JSON.stringify(importedFingerprints))
+    }
+
     toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
     cancelImportPreview()
-  }, [importPreviewSource, importPreviewRecorder, cancelImportPreview, toast])
+  }, [importPreviewSource, importPreviewRecorder, importPreviewFileFingerprint, cancelImportPreview, toast])
 
   const openRevertImport = useCallback(() => {
     setRevertImportOpen(true)
@@ -696,10 +799,29 @@ export function useLedger() {
     }
   }, [importBatches, state.roomId, toast])
 
+  const onSelectImportMember = useCallback((memberId: string) => {
+    pendingImportMemberRef.current = memberId
+    fileRef.current?.click()
+  }, [])
+
+  const onSelectExportMember = useCallback((memberId: string) => {
+    exportTransactionsXlsx(memberId)
+  }, [exportTransactionsXlsx])
+
   const onImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const memberId = members[0]?.id || "wu"
+
+    const fileFingerprint = `${file.name}|${file.size}|${file.lastModified}`
+    const importedFingerprints = JSON.parse(localStorage.getItem("imported-files") || "[]") as string[]
+    if (importedFingerprints.includes(fileFingerprint)) {
+      toast("⚠️ 请勿导入重复账单！")
+      e.target.value = ""
+      return
+    }
+
+    const memberId = pendingImportMemberRef.current || members[0]?.id || "wu"
+    pendingImportMemberRef.current = ""
     const lowerName = file.name.toLowerCase()
 
     if (lowerName.endsWith(".csv")) {
@@ -715,11 +837,11 @@ export function useLedger() {
               source === "alipay"
                 ? parseAlipayCSV(text, memberId, cats)
                 : parseWechatCSV(text, memberId, cats)
-            openImportPreview(result, memberId)
+            openImportPreview(result, memberId, fileFingerprint)
             return
           }
 
-          openImportPreview(parseGenericCsv(text, members, cats, memberId), memberId)
+          openImportPreview(parseGenericCsv(text, members, cats, memberId), memberId, fileFingerprint)
         } catch {
           toast("文件解析失败，请确认是有效的 CSV 文件")
         }
@@ -735,7 +857,8 @@ export function useLedger() {
         try {
           openImportPreview(
             parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats, memberId),
-            memberId
+            memberId,
+            fileFingerprint
           )
         } catch {
           toast("文件解析失败，请检查格式")
@@ -805,6 +928,7 @@ export function useLedger() {
 
   return {
     hydrated,
+    cloudSynced,
     tab,
     theme,
     barWidth,
@@ -934,6 +1058,8 @@ export function useLedger() {
     removeGoal,
     openUpdateGoal,
     saveUpdateGoal,
+    editGoalHistory,
+    deleteGoalHistory,
     addCat,
     removeCat,
     openEditMember,
@@ -943,6 +1069,8 @@ export function useLedger() {
     onAvatarFile,
     onCoupleBgFile,
     onImportFile,
+    onSelectImportMember,
+    onSelectExportMember,
     importPreviewOpen,
     importPreviewSource,
     importPreviewTransactions,
@@ -956,6 +1084,9 @@ export function useLedger() {
     revertImportBatch,
     deleteTransaction,
     exportTransactionsXlsx,
+    celebrateOpen,
+    celebrateMsg,
+    setCelebrateOpen,
     prevReviewMonth,
     nextReviewMonth,
     toast,

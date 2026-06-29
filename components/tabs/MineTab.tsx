@@ -6,6 +6,8 @@ import { useState } from "react"
 
 export function MineTab({
   ledger,
+  onSelectImportMember,
+  onSelectExportMember,
 }: {
   ledger: Pick<
     Ledger,
@@ -28,10 +30,11 @@ export function MineTab({
     | "openRevertImport"
     | "avatarRef"
     | "onAvatarFile"
-    | "exportTransactionsXlsx"
     | "setCatMgmtOpen"
     | "cats"
   >
+  onSelectImportMember: (memberId: string) => void
+  onSelectExportMember: (memberId: string) => void
 }) {
   const {
     coupleDays,
@@ -52,12 +55,13 @@ export function MineTab({
     openRevertImport,
     avatarRef,
     onAvatarFile,
-    exportTransactionsXlsx,
     setCatMgmtOpen,
     cats,
   } = ledger
 
   const [confirmSwitch, setConfirmSwitch] = useState(false)
+  const [importMemberPicker, setImportMemberPicker] = useState(false)
+  const [pendingImportAction, setPendingImportAction] = useState<"import" | "export">("import")
 
   return (
     <section className="page active">
@@ -83,17 +87,21 @@ export function MineTab({
             <div className="couple-avatars-new">
               {members.map((m, i) => (
                 <span key={m.id} className="couple-av-item">
-                  <img className="pixavatar couple-av" src={m.avatar || "/placeholder.svg"} alt={m.name} />
-                  {i === 0 && members.length >= 2 && <span className="couple-heart" aria-hidden="true">♥</span>}
+                  <span className="couple-av-top">
+                    <img className="pixavatar couple-av" src={m.avatar || "/placeholder.svg"} alt={m.name} />
+                    {i === 0 && members.length >= 2 && <span className="couple-heart" aria-hidden="true">♥</span>}
+                  </span>
+                  <span className="couple-av-name">{m.name}</span>
                 </span>
               ))}
             </div>
-            <div className="couple-names-row">{members.map((m) => m.name).join(" & ")}</div>
           </div>
           <div className="couple-right">
-            <div className="couple-days-label">一起记账的</div>
-            <div className="couple-days-num">{coupleDays}</div>
-            <div className="couple-days-unit">天啦</div>
+            <div className="couple-days-oneline">
+              <span className="couple-days-label">开始记账</span>
+              <span className="couple-days-num">{coupleDays}</span>
+              <span className="couple-days-unit">天啦</span>
+            </div>
           </div>
         </div>
         <div className="couple-card-hint">点击换背景</div>
@@ -141,11 +149,17 @@ export function MineTab({
           <span className="set-ico s5">伴</span><span className="set-label">成员管理</span>
           <span className="set-val">{members.length} 人</span><span className="set-arrow">›</span>
         </button>
-        <button className="setrow" onClick={exportTransactionsXlsx}>
+        <button className="setrow" onClick={() => {
+          setPendingImportAction("export")
+          setImportMemberPicker(true)
+        }}>
           <span className="set-ico s6">出</span><span className="set-label">导出账单</span>
           <span className="set-val">.xlsx</span><span className="set-arrow">›</span>
         </button>
-        <button className="setrow" onClick={() => fileRef.current?.click()}>
+        <button className="setrow" onClick={() => {
+          setPendingImportAction("import")
+          setImportMemberPicker(true)
+        }}>
           <span className="set-ico s8">入</span><span className="set-label">导入账单</span>
           <span className="set-val">csv / xlsx</span><span className="set-arrow">›</span>
         </button>
@@ -164,7 +178,6 @@ export function MineTab({
           <span className="set-val">保留数据，重新选择</span><span className="set-arrow">›</span>
         </button>
       </div>
-      {/* 换房间确认弹窗 */}
       {confirmSwitch && (
         <>
           <div className="sheet-mask show" onClick={() => setConfirmSwitch(false)} />
@@ -185,6 +198,37 @@ export function MineTab({
               >
                 确认换房间
               </button>
+            </div>
+          </div>
+        </>
+      )}
+      {importMemberPicker && (
+        <>
+          <div className="sheet-mask show" onClick={() => setImportMemberPicker(false)} />
+          <div className="sheet show" style={{ padding: 20, textAlign: "center" }}>
+            <div className="sheet-title">选择{pendingImportAction === "import" ? "导入" : "导出"}的成员</div>
+            <p style={{ fontSize: 11, color: "var(--text-sub)", margin: "8px 0 16px" }}>
+              账单将{pendingImportAction === "import" ? "归入" : "导出"}所选成员名下
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {members.map((m) => (
+                <button
+                  key={m.id}
+                  className="px-btn ghost"
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                  onClick={() => {
+                    setImportMemberPicker(false)
+                    if (pendingImportAction === "import") {
+                      onSelectImportMember(m.id)
+                    } else {
+                      onSelectExportMember(m.id)
+                    }
+                  }}
+                >
+                  <img className="pixavatar" src={m.avatar || "/placeholder.svg"} alt={m.name} style={{ width: 24, height: 24 }} />
+                  {m.name}
+                </button>
+              ))}
             </div>
           </div>
         </>

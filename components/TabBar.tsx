@@ -15,14 +15,19 @@ export function TabBar({
       {TABS.map((tb) =>
         tb.key === "record" ? (
           <button key={tb.key} className="tab center" onClick={onRecord} aria-label="记一笔">
-            <span className="plus">
-              <img className="t-img record-img" src={tb.img} alt="" aria-hidden="true" />
+            <span className="tab-icon-row tab-icon-row-center">
+              <span className="plus">
+                <img className="t-img record-img" src={tb.img} alt="" aria-hidden="true" />
+              </span>
             </span>
+            <span className="tab-label">{tb.label}</span>
           </button>
         ) : (
           <button key={tb.key} className={`tab ${tab === tb.key ? "active" : ""}`} onClick={() => onSwitch(tb.key)}>
-            <img className="t-img" src={tab === tb.key ? tb.imgActive : tb.img} alt="" aria-hidden="true" />
-            {tb.label}
+            <span className="tab-icon-row">
+              <img className="t-img" src={tab === tb.key ? tb.imgActive : tb.img} alt="" aria-hidden="true" />
+            </span>
+            <span className="tab-label">{tb.label}</span>
           </button>
         )
       )}

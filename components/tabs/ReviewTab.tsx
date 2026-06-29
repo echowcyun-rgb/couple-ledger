@@ -6,7 +6,6 @@ import type { Ledger } from "@/hooks/useLedger"
 export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
   | "reviewYear"
   | "reviewMonth"
-  | "reviewSummary"
   | "members"
   | "getInTrendData"
   | "getOutTrendData"
@@ -27,7 +26,6 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
   const {
     reviewYear,
     reviewMonth,
-    reviewSummary,
     members,
     getInTrendData,
     getOutTrendData,
@@ -62,11 +60,6 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
           <button className="ms-btn" onClick={nextReviewMonth}>▶</button>
         </div>
       </header>
-      <div className="review-top">
-        <div className="rt-cell"><div className="rt-l">收入</div><div className="rt-v in">{yuan(reviewSummary.income)}</div></div>
-        <div className="rt-cell"><div className="rt-l">支出</div><div className="rt-v out">{yuan(reviewSummary.expense)}</div></div>
-        <div className="rt-cell"><div className="rt-l">结余</div><div className="rt-v">{yuan(reviewSummary.balance)}</div></div>
-      </div>
       <div className="section-title">习惯分析</div>
       <div className="card">
         <div className="stat-table">

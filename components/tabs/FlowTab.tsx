@@ -7,7 +7,6 @@ export function FlowTab({
 }: {
   ledger: Pick<Ledger,
     | "currentMonth"
-    | "flowMonthSummary"
     | "flowFilter"
     | "setFlowFilter"
     | "members"
@@ -19,7 +18,7 @@ export function FlowTab({
     | "openEditRecord"
   >
 }) {
-  const { currentMonth, flowMonthSummary, flowFilter, setFlowFilter, members, filteredFlow, cats, deleteTransaction, toast, openEditRecord } = ledger
+  const { currentMonth, flowFilter, setFlowFilter, members, filteredFlow, cats, deleteTransaction, toast, openEditRecord } = ledger
 
   // 类型筛选: "all" | "out" | "in" | "save"
   const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
@@ -146,15 +145,6 @@ export function FlowTab({
           <div className="names">流水明细</div>
         </div>
       </header>
-      <div className="flow-summary">
-        <div className="fs-item"><div className="fs-label">收入</div><div className="fs-num in">{yuan(flowMonthSummary.income)}</div></div>
-        <div className="fs-sep" aria-hidden="true" />
-        <div className="fs-item"><div className="fs-label">支出</div><div className="fs-num out">{yuan(flowMonthSummary.expense)}</div></div>
-        <div className="fs-sep" aria-hidden="true" />
-        <div className="fs-item"><div className="fs-label">存钱</div><div className="fs-num save">{yuan(flowMonthSummary.savings)}</div></div>
-        <div className="fs-sep" aria-hidden="true" />
-        <div className="fs-item"><div className="fs-label">结余</div><div className="fs-num">{yuan(flowMonthSummary.balance)}</div></div>
-      </div>
       {/* 筛选区：类型横排 + 分类下拉 + 经手人横排 */}
       <div className="flow-filter-row">
         <div className="filters">

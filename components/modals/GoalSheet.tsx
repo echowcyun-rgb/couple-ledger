@@ -115,14 +115,14 @@ export function GoalSheet({
                         {g.id === activeGoalId && <span className="goal-cur-tag">进行中</span>}
                       </div>
                       <div className="goal-progress-row">
-                        <span className="goal-cur-val">¥{g.current.toLocaleString()}</span>
+                        <span className="goal-cur-val">¥{g.current}</span>
                         <span className="goal-sep">/</span>
-                        <span className="goal-tgt-val">¥{g.target.toLocaleString()}</span>
+                        <span className="goal-tgt-val">¥{g.target}</span>
                       </div>
                       <div className="goal-track"><div className="goal-fill" style={{ width: `${gp}%` }} /></div>
                       <div className="goal-sub-row">
                         <span className="goal-pct">{gp}%</span>
-                        <span className="goal-hint">目标 ¥{g.target.toLocaleString()}，{gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${(g.target - g.current).toLocaleString()}`}</span>
+                        <span className="goal-hint">目标 ¥{g.target}，{gp === 0 ? "从今天开始存吧 ✨" : `还差 ¥${g.target - g.current}`}</span>
                       </div>
                     </div>
                   </button>
@@ -150,9 +150,9 @@ export function GoalSheet({
                       <span className="goal-done-tag">✅ 已完成</span>
                     </div>
                     <div className="goal-progress-row">
-                      <span className="goal-cur-val">¥{g.current.toLocaleString()}</span>
+                      <span className="goal-cur-val">¥{g.current}</span>
                       <span className="goal-sep">/</span>
-                      <span className="goal-tgt-val">¥{g.target.toLocaleString()}</span>
+                      <span className="goal-tgt-val">¥{g.target}</span>
                     </div>
                     {g.completedAt && (
                       <div className="goal-sub-row">

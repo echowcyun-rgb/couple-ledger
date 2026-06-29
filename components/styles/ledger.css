@@ -51,6 +51,8 @@
   background-size: 26px 26px, 100% 10px;
 }
 .app .battle-white-overlay { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.18); pointer-events: none; z-index: 1; }
+.app .battle-head-area { position: relative; margin-bottom: 12px; }
+.app .battle-head-area .battle-white-overlay { border-radius: 12px 12px 0 0; }
 .app .battle-inner { position: relative; z-index: 2; padding: 16px; }
 .app .battle-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .app .battle-title { color: var(--cream); font-size: 14px; text-shadow: 2px 2px 0 rgba(0,0,0,.25); }
@@ -402,6 +404,7 @@
 .app .cat-del-btn { border: 2px solid var(--ink); border-radius: 7px; background: var(--out); color: var(--cream); width: 26px; height: 26px; font-size: 11px; cursor: pointer; flex: 0 0 auto; }
 .app .cat-type-seg { display: flex; gap: 6px; margin-bottom: 10px; background: var(--cream); border: 2px solid var(--ink); border-radius: 9px; padding: 3px; }
 .app .cat-type-seg .seg-btn { flex: 1; }
+.app .cat-add-form .cat-name-input { width: 100%; margin-bottom: 10px; box-sizing: border-box; }
 
 /* 目标 emoji 预设 */
 .app .ga-emoji-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
@@ -529,11 +532,11 @@
 
 /* 首页多目标卡片 */
 .app .goal-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.app .goal-card { background: rgba(255,255,255,.08); border: 2px solid var(--ink); border-radius: 10px; padding: 12px; }
+.app .goal-card { background: rgba(255,255,255,.08); border: 2px solid var(--ink); border-radius: 10px; padding: 12px; position: relative; z-index: 2; }
 .app .goal-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .app .goal-card-emoji { font-size: 18px; }
 .app .goal-card-name { font-family: var(--font-pixel-cjk), monospace; font-size: 12px; color: #FFFFFF; flex: 1; }
-.app .goal-card-days { font-family: var(--font-pixel), monospace; font-size: 9px; color: var(--orange); }
+.app .goal-card-days { font-family: var(--font-pixel), monospace; font-size: 9px; color: #FFFFFF; font-weight: 700; }
 .app .goal-card-amt { font-family: var(--font-pixel), monospace; font-size: 11px; color: #FFFFFF; margin-top: 4px; }
 .app .goal-card-amt .cur { color: #FFFFFF; }
 .app .goal-card-amt .tgt { color: rgba(255,255,255,.7); }

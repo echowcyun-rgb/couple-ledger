@@ -292,12 +292,13 @@
 /* Tab 栏 */
 .app .tabbar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--card); border-top: 4px solid var(--ink); display: flex; align-items: center; padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 60; }
 .app .tab { flex: 1; background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-sub); font-family: var(--font-pixel-cjk), monospace; font-size: 10px; transition: transform .08s steps(2); padding: 2px 0; }
-.app .tab .t-img { width: 30px; height: 30px; image-rendering: pixelated; filter: saturate(.55) opacity(.7); transition: filter .12s steps(2), transform .12s steps(2); }
+.app .tab .t-img { width: 30px; height: 30px; image-rendering: pixelated; transition: transform .12s steps(2); }
 .app .tab.active { color: var(--accent-dark); }
-.app .tab.active .t-img { filter: none; transform: translateY(-1px) scale(1.08); }
+.app .tab.active .t-img { transform: translateY(-1px) scale(1.08); }
 .app .tab:active { transform: translateY(2px); }
 .app .tab.center { flex: 0 0 auto; }
-.app .tab.center .plus { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: var(--accent); color: var(--cream); border: 4px solid var(--ink); border-radius: 14px; font-size: 26px; line-height: 1; box-shadow: 3px 3px 0 var(--ink); transition: transform .08s steps(2), box-shadow .08s steps(2); }
+.app .tab.center .plus { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: var(--accent); border: 4px solid var(--ink); border-radius: 14px; box-shadow: 3px 3px 0 var(--ink); transition: transform .08s steps(2), box-shadow .08s steps(2); overflow: hidden; }
+.app .tab.center .plus .record-img { width: 32px; height: 32px; image-rendering: pixelated; }
 .app .tab.center:active .plus { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
 
 /* 全页（成员管理）*/

@@ -33,11 +33,11 @@ export const PIE_COLORS = ["#F0A03C", "#F0CF3C", "#7FC8E8", "#D96A7E", "#3DAE83"
 export const MEMBER_CHART_COLORS = ["#F0A03C", "#6079C9", "#3DAE83", "#D96A7E"]
 
 export const TABS = [
-  { key: "home" as const, img: "/nav-home.png", label: "首页" },
-  { key: "flow" as const, img: "/nav-flow.png", label: "流水" },
-  { key: "record" as const, img: "", label: "记账" },
-  { key: "review" as const, img: "/nav-review.png", label: "复盘" },
-  { key: "mine" as const, img: "/nav-mine.png", label: "我的" },
+  { key: "home" as const, img: "/tabbar/home.png", imgActive: "/tabbar/home-active.png", label: "首页" },
+  { key: "flow" as const, img: "/tabbar/flow.png", imgActive: "/tabbar/flow-active.png", label: "流水" },
+  { key: "record" as const, img: "/tabbar/record.png", imgActive: "/tabbar/record.png", label: "" },
+  { key: "review" as const, img: "/tabbar/review.png", imgActive: "/tabbar/review-active.png", label: "复盘" },
+  { key: "mine" as const, img: "/tabbar/mine.png", imgActive: "/tabbar/mine-active.png", label: "我的" },
 ]
 
 export const REVIEW_INSIGHT_RULES = [

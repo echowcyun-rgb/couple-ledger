@@ -81,10 +81,12 @@ export function MineTab({
         <div className="couple-inner couple-inner-new">
           <div className="couple-left">
             <div className="couple-avatars-new">
-              {members.map((m) => (
-                <img key={m.id} className="pixavatar couple-av" src={m.avatar || "/placeholder.svg"} alt={m.name} />
+              {members.map((m, i) => (
+                <span key={m.id} className="couple-av-item">
+                  <img className="pixavatar couple-av" src={m.avatar || "/placeholder.svg"} alt={m.name} />
+                  {i === 0 && members.length >= 2 && <span className="couple-heart" aria-hidden="true">♥</span>}
+                </span>
               ))}
-              {members.length >= 2 && <span className="couple-heart" aria-hidden="true">♥</span>}
             </div>
             <div className="couple-names-row">{members.map((m) => m.name).join(" & ")}</div>
           </div>

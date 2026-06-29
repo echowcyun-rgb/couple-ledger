@@ -100,6 +100,8 @@ export function getTrendData(
       return buildRow(String(day), dayTxs)
     })
   }
+
+  return []
 }
 
 export function getInTrendData(

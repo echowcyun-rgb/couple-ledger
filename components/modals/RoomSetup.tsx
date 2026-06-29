@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { createRoom, validateRoom, isCloudReady } from "@/lib/supabase"
+import { CLOUD_TIMEOUT_MS } from "@/lib/sync-utils"
 
 interface Props {
   onDone: (roomId: string) => void
@@ -21,8 +22,8 @@ export default function RoomSetup({ onDone }: Props) {
     const timer = setTimeout(() => {
       timedOut = true
       setLoading(false)
-      setError("创建超时（8秒），请检查网络连接后重试")
-    }, 8000)
+      setError(`创建超时（${CLOUD_TIMEOUT_MS / 1000}秒），请检查网络连接后重试`)
+    }, CLOUD_TIMEOUT_MS)
     try {
       const roomId = await createRoom()
       clearTimeout(timer)
@@ -58,8 +59,8 @@ export default function RoomSetup({ onDone }: Props) {
     const timer = setTimeout(() => {
       timedOut = true
       setLoading(false)
-      setError("验证超时（8秒），请检查网络连接后重试")
-    }, 8000)
+      setError(`验证超时（${CLOUD_TIMEOUT_MS / 1000}秒），请检查网络连接后重试`)
+    }, CLOUD_TIMEOUT_MS)
     try {
       const exists = await validateRoom(code)
       clearTimeout(timer)

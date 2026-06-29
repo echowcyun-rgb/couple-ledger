@@ -3,9 +3,9 @@
  * 策略：写入先写 localStorage（即时响应），后台异步推云端
  * 读取优先读本地，云只用来合并
  */
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type PostgrestError } from "@supabase/supabase-js"
 import type { Transaction, Goal, Member, ImportBatch, AppState } from "./types"
-import { loadState, saveState } from "./storage"
+import { withRetry, withTimeout } from "./sync-utils"
 
 // ===== 客户端初始化 =====
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -45,12 +45,23 @@ function saveLocalRoom(code: string): void {
   }
 }
 
-// ===== 通用超时包装 =====
-function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("云同步超时")), ms)),
-  ])
+type SupabaseResult<T> = { data: T | null; error: PostgrestError | null }
+
+async function runSupabase<T>(
+  op: () => PromiseLike<SupabaseResult<T>>
+): Promise<T | null> {
+  return withRetry(async () => {
+    const { data, error } = await withTimeout(op())
+    if (error) throw error
+    return data
+  })
+}
+
+async function runSupabaseVoid(op: () => PromiseLike<SupabaseResult<unknown>>): Promise<void> {
+  await withRetry(async () => {
+    const { error } = await withTimeout(op())
+    if (error) throw error
+  })
 }
 
 function txToRow(tx: Transaction, roomId: string) {
@@ -90,10 +101,14 @@ function rowToTx(r: Record<string, unknown>): Transaction {
 export async function pullTransactions(roomId: string): Promise<Transaction[]> {
   if (!supabase) return []
   try {
-    const { data, error } = await withTimeout(
-      supabase.from("transactions").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(500)
+    const data = await runSupabase(() =>
+      supabase!
+        .from("transactions")
+        .select("*")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: false })
+        .limit(500)
     )
-    if (error) throw error
     return (data || []).map((r) => rowToTx(r as Record<string, unknown>))
   } catch (e) {
     console.warn("拉取云端交易记录失败:", e)
@@ -104,10 +119,9 @@ export async function pullTransactions(roomId: string): Promise<Transaction[]> {
 export async function pushTransaction(tx: Transaction, roomId: string): Promise<boolean> {
   if (!supabase) return false
   try {
-    const { error } = await withTimeout(
-      supabase.from("transactions").upsert(txToRow(tx, roomId), { onConflict: "id" })
+    await runSupabaseVoid(() =>
+      supabase!.from("transactions").upsert(txToRow(tx, roomId), { onConflict: "id" })
     )
-    if (error) throw error
     return true
   } catch (e) {
     console.warn("推送交易记录到云端失败:", e)
@@ -118,10 +132,14 @@ export async function pushTransaction(tx: Transaction, roomId: string): Promise<
 export async function pushTransactions(txns: Transaction[], roomId: string): Promise<boolean> {
   if (!supabase || txns.length === 0) return false
   try {
-    const { error } = await withTimeout(
-      supabase.from("transactions").upsert(txns.map((t) => txToRow(t, roomId)), { onConflict: "id" })
+    await runSupabaseVoid(() =>
+      supabase!
+        .from("transactions")
+        .upsert(
+          txns.map((t) => txToRow(t, roomId)),
+          { onConflict: "id" }
+        )
     )
-    if (error) throw error
     return true
   } catch (e) {
     console.warn("批量推送交易记录失败:", e)
@@ -132,10 +150,9 @@ export async function pushTransactions(txns: Transaction[], roomId: string): Pro
 export async function deleteCloudTransaction(id: string, roomId: string): Promise<boolean> {
   if (!supabase) return false
   try {
-    const { error } = await withTimeout(
-      supabase.from("transactions").delete().eq("id", id).eq("room_id", roomId)
+    await runSupabaseVoid(() =>
+      supabase!.from("transactions").delete().eq("id", id).eq("room_id", roomId)
     )
-    if (error) throw error
     return true
   } catch (e) {
     console.warn("删除云端交易记录失败:", e)
@@ -148,21 +165,23 @@ export async function deleteCloudTransaction(id: string, roomId: string): Promis
 export async function pullGoals(roomId: string): Promise<Goal[]> {
   if (!supabase) return []
   try {
-    const { data, error } = await withTimeout(
-      supabase.from("goals").select("*").eq("room_id", roomId).order("id", { ascending: true })
+    const data = await runSupabase(() =>
+      supabase!.from("goals").select("*").eq("room_id", roomId).order("id", { ascending: true })
     )
-    if (error) throw error
-    return (data || []).map((g: Record<string, unknown>) => ({
-      id: g.id as number,
-      name: g.name as string,
-      emoji: (g.emoji as string) || "★",
-      current: (g.current as number) ?? 0,
-      target: g.target as number,
-      contributions: (g.contributions as Record<string, number>) || {},
-      history: (g.history as Goal["history"]) || [],
-      deadline: (g.deadline as string) || "",
-      completedAt: (g.completedAt as string) || undefined,
-    }))
+    return (data || []).map((g) => {
+      const row = g as Record<string, unknown>
+      return {
+        id: row.id as number,
+        name: row.name as string,
+        emoji: (row.emoji as string) || "★",
+        current: (row.current as number) ?? 0,
+        target: row.target as number,
+        contributions: (row.contributions as Record<string, number>) || {},
+        history: (row.history as Goal["history"]) || [],
+        deadline: (row.deadline as string) || "",
+        completedAt: (row.completedAt as string) || undefined,
+      }
+    })
   } catch (e) {
     console.warn("拉取云端目标失败:", e)
     return []
@@ -172,13 +191,6 @@ export async function pullGoals(roomId: string): Promise<Goal[]> {
 export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean> {
   if (!supabase || goals.length === 0) return false
   try {
-    // 删除云端所有目标，再批量插入（简化同步逻辑）
-    // 因为 Goal 有 contributions/history 这种嵌套 JSON，upsert 容易冲突
-    const { error: delErr } = await withTimeout(
-      supabase.from("goals").delete().eq("room_id", roomId)
-    )
-    if (delErr) throw delErr
-
     const rows = goals.map((g) => ({
       id: g.id,
       room_id: roomId,
@@ -191,10 +203,9 @@ export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean>
       deadline: g.deadline || "",
       completedAt: g.completedAt || null,
     }))
-    const { error: insErr } = await withTimeout(
-      supabase.from("goals").insert(rows)
+    await runSupabaseVoid(() =>
+      supabase!.from("goals").upsert(rows, { onConflict: "room_id,id" })
     )
-    if (insErr) throw insErr
     return true
   } catch (e) {
     console.warn("推送目标到云端失败:", e)
@@ -207,17 +218,19 @@ export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean>
 export async function pullMembers(roomId: string): Promise<Member[]> {
   if (!supabase) return []
   try {
-    const { data, error } = await withTimeout(
-      supabase.from("members").select("*").eq("room_id", roomId)
+    const data = await runSupabase(() =>
+      supabase!.from("members").select("*").eq("room_id", roomId)
     )
-    if (error) throw error
-    return (data || []).map((m: Record<string, unknown>) => ({
-      id: m.id as string,
-      name: m.name as string,
-      avatar: (m.avatar as string) || "",
-      gender: (m.gender as Member["gender"]) || "other",
-      payday: (m.payday as number) ?? 10,
-    }))
+    return (data || []).map((m) => {
+      const row = m as Record<string, unknown>
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        avatar: (row.avatar as string) || "",
+        gender: (row.gender as Member["gender"]) || "other",
+        payday: (row.payday as number) ?? 10,
+      }
+    })
   } catch (e) {
     console.warn("拉取云端成员失败:", e)
     return []
@@ -227,14 +240,17 @@ export async function pullMembers(roomId: string): Promise<Member[]> {
 export async function pushMembers(members: Member[], roomId: string): Promise<boolean> {
   if (!supabase || members.length === 0) return false
   try {
-    const { error: delErr } = await withTimeout(
-      supabase.from("members").delete().eq("room_id", roomId)
+    const rows = members.map((m) => ({
+      id: m.id,
+      room_id: roomId,
+      name: m.name,
+      avatar: m.avatar,
+      gender: m.gender,
+      payday: m.payday,
+    }))
+    await runSupabaseVoid(() =>
+      supabase!.from("members").upsert(rows, { onConflict: "room_id,id" })
     )
-    if (delErr) throw delErr
-    const { error: insErr } = await withTimeout(
-      supabase.from("members").insert(members.map(m => ({ ...m, room_id: roomId })))
-    )
-    if (insErr) throw insErr
     return true
   } catch (e) {
     console.warn("推送成员到云端失败:", e)
@@ -247,17 +263,23 @@ export async function pushMembers(members: Member[], roomId: string): Promise<bo
 export async function pullImportBatches(roomId: string): Promise<ImportBatch[]> {
   if (!supabase) return []
   try {
-    const { data, error } = await withTimeout(
-      supabase.from("import_batches").select("*").eq("room_id", roomId).order("time", { ascending: false })
+    const data = await runSupabase(() =>
+      supabase!
+        .from("import_batches")
+        .select("*")
+        .eq("room_id", roomId)
+        .order("time", { ascending: false })
     )
-    if (error) throw error
-    return (data || []).map((b: Record<string, unknown>) => ({
-      ids: b.ids as string[],
-      source: b.source as ImportBatch["source"],
-      recorder: b.recorder as string,
-      count: b.count as number,
-      time: b.time as string,
-    }))
+    return (data || []).map((b) => {
+      const row = b as Record<string, unknown>
+      return {
+        ids: row.ids as string[],
+        source: row.source as ImportBatch["source"],
+        recorder: row.recorder as string,
+        count: row.count as number,
+        time: row.time as string,
+      }
+    })
   } catch (e) {
     console.warn("拉取云端导入批次失败:", e)
     return []
@@ -267,21 +289,17 @@ export async function pullImportBatches(roomId: string): Promise<ImportBatch[]> 
 export async function pushImportBatches(batches: ImportBatch[], roomId: string): Promise<boolean> {
   if (!supabase || batches.length === 0) return false
   try {
-    const { error: delErr } = await withTimeout(
-      supabase.from("import_batches").delete().eq("room_id", roomId)
+    const rows = batches.map((b) => ({
+      room_id: roomId,
+      ids: b.ids,
+      source: b.source,
+      recorder: b.recorder,
+      count: b.count,
+      time: b.time,
+    }))
+    await runSupabaseVoid(() =>
+      supabase!.from("import_batches").upsert(rows, { onConflict: "room_id,time" })
     )
-    if (delErr) throw delErr
-    const { error: insErr } = await withTimeout(
-      supabase.from("import_batches").insert(batches.map((b) => ({
-        room_id: roomId,
-        ids: b.ids,
-        source: b.source,
-        recorder: b.recorder,
-        count: b.count,
-        time: b.time,
-      })))
-    )
-    if (insErr) throw insErr
     return true
   } catch (e) {
     console.warn("推送导入批次到云端失败:", e)
@@ -293,17 +311,13 @@ export async function pushImportBatches(batches: ImportBatch[], roomId: string):
 
 /** 验证房号是否存在 */
 export async function validateRoom(roomId: string): Promise<boolean> {
-  // 本地模式 fallback：检查 localStorage 中的房号列表
   if (!supabase) {
     return getLocalRooms().includes(roomId)
   }
   try {
-    const { data, error } = await supabase
-      .from("couples")
-      .select("room_id")
-      .eq("room_id", roomId)
-      .maybeSingle()
-    if (error) throw error
+    const data = await runSupabase(() =>
+      supabase!.from("couples").select("room_id").eq("room_id", roomId).maybeSingle()
+    )
     return !!data
   } catch {
     return false
@@ -312,7 +326,6 @@ export async function validateRoom(roomId: string): Promise<boolean> {
 
 /** 创建新房间，返回房号 */
 export async function createRoom(): Promise<string> {
-  // 本地模式 fallback：生成随机4位房号存入 localStorage
   if (!supabase) {
     const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
     const existing = getLocalRooms()
@@ -330,15 +343,18 @@ export async function createRoom(): Promise<string> {
     console.warn("[createRoom] 本地模式生成房号失败，已达最大尝试次数")
     return ""
   }
-  // 生成4位随机数
   const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
   let roomId = generateCode()
   let attempts = 0
   while (attempts < 10) {
     const exists = await validateRoom(roomId)
     if (!exists) {
-      const { error } = await supabase.from("couples").insert({ room_id: roomId })
-      if (!error) return roomId
+      try {
+        await runSupabaseVoid(() => supabase!.from("couples").insert({ room_id: roomId }))
+        return roomId
+      } catch {
+        // 碰撞或 transient 错误，换号重试
+      }
     }
     roomId = generateCode()
     attempts++
@@ -359,7 +375,7 @@ export async function fullPull(roomId: string): Promise<Partial<AppState>> {
   return {
     transactions: txns,
     goals,
-    members: members.length > 0 ? members : undefined, // 本地优先
+    members: members.length > 0 ? members : undefined,
     importBatches: batches,
   }
 }

@@ -82,4 +82,4 @@ export function currentPlanKey(year: number, month: number) {
   return monthKeyFromParts(year, month)
 }
 
-export { REVIEW_INSIGHT_RULES }
+export { REVIEW_INSIGHT_RULES } from "./constants"

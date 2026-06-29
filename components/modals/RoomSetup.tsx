@@ -2,10 +2,16 @@
 
 import { useState } from "react"
 import { createRoom, validateRoom, isCloudReady } from "@/lib/supabase"
-import { CLOUD_TIMEOUT_MS } from "@/lib/sync-utils"
 
 interface Props {
   onDone: (roomId: string) => void
+}
+
+function roomSetupErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error && e.message.includes("云同步超时")) {
+    return "操作超时，请检查网络连接后重试"
+  }
+  return fallback
 }
 
 export default function RoomSetup({ onDone }: Props) {
@@ -18,17 +24,8 @@ export default function RoomSetup({ onDone }: Props) {
   const handleCreate = async () => {
     setLoading(true)
     setError("")
-    let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
-      setLoading(false)
-      setError(`创建超时（${CLOUD_TIMEOUT_MS / 1000}秒），请检查网络连接后重试`)
-    }, CLOUD_TIMEOUT_MS)
     try {
       const roomId = await createRoom()
-      clearTimeout(timer)
-      if (timedOut) return
-      setLoading(false)
       if (!roomId) {
         setError(
           isCloudReady()
@@ -40,10 +37,10 @@ export default function RoomSetup({ onDone }: Props) {
       setCreatedRoom(roomId)
       setMode("create")
     } catch (e) {
-      clearTimeout(timer)
-      setLoading(false)
       console.warn("[RoomSetup] 创建账本失败:", e)
-      setError("创建失败，网络异常，请检查连接后重试")
+      setError(roomSetupErrorMessage(e, "创建失败，网络异常，请检查连接后重试"))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -55,17 +52,8 @@ export default function RoomSetup({ onDone }: Props) {
     }
     setLoading(true)
     setError("")
-    let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
-      setLoading(false)
-      setError(`验证超时（${CLOUD_TIMEOUT_MS / 1000}秒），请检查网络连接后重试`)
-    }, CLOUD_TIMEOUT_MS)
     try {
       const exists = await validateRoom(code)
-      clearTimeout(timer)
-      if (timedOut) return
-      setLoading(false)
       if (!exists) {
         setError(
           isCloudReady()
@@ -78,10 +66,10 @@ export default function RoomSetup({ onDone }: Props) {
       localStorage.setItem("couple-room-id", code)
       onDone(code)
     } catch (e) {
-      clearTimeout(timer)
-      setLoading(false)
       console.warn("[RoomSetup] 加入账本失败:", e)
-      setError("验证失败，网络异常，请检查连接后重试")
+      setError(roomSetupErrorMessage(e, "验证失败，网络异常，请检查连接后重试"))
+    } finally {
+      setLoading(false)
     }
   }
 

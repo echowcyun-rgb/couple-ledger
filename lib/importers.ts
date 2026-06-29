@@ -45,6 +45,36 @@ function makeBatch(
   }
 }
 
+function splitBillLines(content: string): string[] {
+  return content.split("\n").filter((l) => l.trim())
+}
+
+function findCsvHeader(
+  lines: string[],
+  validate?: (cols: string[]) => boolean
+): { headerIdx: number; colIndex: Map<string, number> } | null {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.includes("交易时间") || !line.includes("收/支")) continue
+    const cols = parseCSVLine(line).map((c) => c.trim())
+    if (validate && !validate(cols)) continue
+    const colIndex = new Map<string, number>()
+    cols.forEach((name, idx) => {
+      if (name) colIndex.set(name, idx)
+    })
+    return { headerIdx: i, colIndex }
+  }
+  return null
+}
+
+function pickCol(row: string[], colIndex: Map<string, number>, ...names: string[]): string {
+  for (const name of names) {
+    const idx = colIndex.get(name)
+    if (idx != null && row[idx] != null) return String(row[idx]).trim()
+  }
+  return ""
+}
+
 // ===== CSV 解析 =====
 
 function parseCSVLine(line: string): string[] {
@@ -77,34 +107,35 @@ export function parseAlipayCSV(
   memberId: string,
   cats: Category[] = []
 ): ImportResult {
-  const lines = content.split("\n").filter((l) => l.trim())
+  const lines = splitBillLines(content)
   const transactions: Transaction[] = []
   let unrecognized = 0
-  let headerIdx = -1
 
-  for (let i = 0; i < lines.length; i++) {
-    if (
-      headerIdx < 0 &&
-      (lines[i].includes("交易时间") || lines[i].includes("收/支"))
-    ) {
-      headerIdx = i
-      continue
+  const header = findCsvHeader(lines, (cols) =>
+    cols.some((c) => c === "交易分类" || c === "商品说明")
+  )
+  if (!header) {
+    return {
+      transactions: [],
+      batch: makeBatch([], "alipay", memberId),
+      unrecognized: lines.length,
     }
-    if (headerIdx < 0) continue
+  }
 
+  for (let i = header.headerIdx + 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i])
     if (cols.length < 6) {
       unrecognized++
       continue
     }
 
-    const date = cols[0]?.slice(0, 10) || ""
-    const typeLabel = cols[4]?.trim() || ""
-    const amountStr = cols[5]?.trim() || ""
-    const counterparty = cols[2]?.trim() || ""
-    const desc = cols[3]?.trim() || ""
-    const note = cols[9]?.trim() || ""
-    const categoryLabel = cols[1]?.trim() || ""
+    const date = pickCol(cols, header.colIndex, "交易时间").slice(0, 10)
+    const typeLabel = pickCol(cols, header.colIndex, "收/支")
+    const amountStr = pickCol(cols, header.colIndex, "金额")
+    const counterparty = pickCol(cols, header.colIndex, "交易对方")
+    const desc = pickCol(cols, header.colIndex, "商品说明")
+    const remark = pickCol(cols, header.colIndex, "备注")
+    const categoryLabel = pickCol(cols, header.colIndex, "交易分类")
 
     if (!date || !amountStr) {
       unrecognized++
@@ -120,13 +151,13 @@ export function parseAlipayCSV(
     const type: TxType =
       typeLabel === "收入" ? "in" : typeLabel === "支出" ? "out" : "out"
 
-    const status = cols[6]?.trim() || ""
+    const status = pickCol(cols, header.colIndex, "交易状态")
     if (status.includes("关闭") || status.includes("退款")) {
       unrecognized++
       continue
     }
 
-    const matchText = [desc, note, counterparty].filter(Boolean).join(" ")
+    const matchText = [desc, remark, counterparty].filter(Boolean).join(" ")
     const explicitKey = resolveCategoryFromCell(categoryLabel, cats)
 
     transactions.push({
@@ -136,7 +167,7 @@ export function parseAlipayCSV(
       amount,
       categoryKey: suggestCategory(matchText, type, cats, explicitKey),
       memberId,
-      note: desc || note || counterparty,
+      note: desc || remark || counterparty,
       createdAt: Date.now() + i,
     })
   }
@@ -159,34 +190,35 @@ export function parseWechatCSV(
   memberId: string,
   cats: Category[] = []
 ): ImportResult {
-  const lines = content.split("\n").filter((l) => l.trim())
+  const lines = splitBillLines(content)
   const transactions: Transaction[] = []
   let unrecognized = 0
-  let headerIdx = -1
 
-  for (let i = 0; i < lines.length; i++) {
-    if (
-      headerIdx < 0 &&
-      (lines[i].includes("交易时间") || lines[i].includes("收/支"))
-    ) {
-      headerIdx = i
-      continue
+  const header = findCsvHeader(lines, (cols) =>
+    cols.some((c) => c === "交易类型" || c === "商品" || c === "商品说明")
+  )
+  if (!header) {
+    return {
+      transactions: [],
+      batch: makeBatch([], "wechat", memberId),
+      unrecognized: lines.length,
     }
-    if (headerIdx < 0) continue
+  }
 
+  for (let i = header.headerIdx + 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i])
     if (cols.length < 6) {
       unrecognized++
       continue
     }
 
-    const date = cols[0]?.slice(0, 10) || ""
-    const typeLabel = cols[4]?.trim() || ""
-    const amountStr = cols[5]?.trim() || ""
-    const counterparty = cols[2]?.trim() || ""
-    const desc = cols[3]?.trim() || ""
-    const note = cols[10]?.trim() || ""
-    const typeName = cols[1]?.trim() || ""
+    const date = pickCol(cols, header.colIndex, "交易时间").slice(0, 10)
+    const typeLabel = pickCol(cols, header.colIndex, "收/支")
+    const amountStr = pickCol(cols, header.colIndex, "金额", "金额(元)", "金额（元）")
+    const counterparty = pickCol(cols, header.colIndex, "交易对方")
+    const desc = pickCol(cols, header.colIndex, "商品说明", "商品")
+    const remark = pickCol(cols, header.colIndex, "备注")
+    const typeName = pickCol(cols, header.colIndex, "交易类型")
 
     if (!date || !amountStr) {
       unrecognized++
@@ -202,13 +234,13 @@ export function parseWechatCSV(
     const type: TxType =
       typeLabel === "收入" ? "in" : typeLabel === "支出" ? "out" : "out"
 
-    const status = cols[7]?.trim() || ""
+    const status = pickCol(cols, header.colIndex, "交易状态", "当前状态")
     if (status.includes("已关闭") || status.includes("已退款")) {
       unrecognized++
       continue
     }
 
-    const matchText = [desc, note, counterparty, typeName].filter(Boolean).join(" ")
+    const matchText = [desc, remark, counterparty, typeName].filter(Boolean).join(" ")
     const explicitKey = resolveCategoryFromCell(typeName, cats)
 
     transactions.push({
@@ -218,7 +250,7 @@ export function parseWechatCSV(
       amount,
       categoryKey: suggestCategory(matchText, type, cats, explicitKey),
       memberId,
-      note: desc || note || counterparty,
+      note: desc || remark || counterparty,
       createdAt: Date.now() + i,
     })
   }
@@ -233,20 +265,33 @@ export function parseWechatCSV(
 // ===== 自动检测来源 =====
 
 export function detectSource(
-  content: string
+  content: string,
+  fileName = ""
 ): "alipay" | "wechat" | "unknown" {
-  const firstFew = content.slice(0, 500)
-  if (firstFew.includes("微信支付账单明细") || firstFew.includes("微信账单")) {
+  const name = fileName.toLowerCase()
+  if (name.includes("支付宝") || name.includes("alipay")) return "alipay"
+  if (name.includes("微信") || name.includes("wechat")) return "wechat"
+
+  const sample = content.slice(0, 8000)
+  if (sample.includes("微信支付账单明细") || sample.includes("微信账单")) {
     return "wechat"
   }
   if (
-    firstFew.includes("支付宝") &&
-    (firstFew.includes("账单") || firstFew.includes("交易流水"))
+    sample.includes("支付宝账户") ||
+    sample.includes("支付宝支付科技有限公司") ||
+    (sample.includes("支付宝") &&
+      (sample.includes("账单") || sample.includes("交易流水") || sample.includes("交易明细")))
   ) {
     return "alipay"
   }
-  if (firstFew.includes("商品说明") && firstFew.includes("收/支")) {
-    return firstFew.includes("交易分类") ? "alipay" : "wechat"
+  if (sample.includes("交易分类") && sample.includes("商品说明") && sample.includes("收/支")) {
+    return "alipay"
+  }
+  if (sample.includes("商品说明") && sample.includes("收/支")) {
+    return sample.includes("交易分类") ? "alipay" : "wechat"
+  }
+  if (sample.includes("交易类型") && sample.includes("收/支") && sample.includes("商品")) {
+    return "wechat"
   }
   return "unknown"
 }
@@ -391,7 +436,7 @@ function rowsToTransactions(
       const product = String(
         getCell(row, "商品说明", "说明", "商品", "摘要") ?? ""
       ).trim()
-      const note = String(getCell(row, "note", "备注") ?? "").trim()
+      const remark = String(getCell(row, "note", "备注") ?? "").trim()
       const counterparty = String(
         getCell(row, "memberId", "成员", "member", "经手人", "交易对方") ?? ""
       ).trim()
@@ -407,7 +452,7 @@ function rowsToTransactions(
       if (!date || !type || !Number.isFinite(amount) || amount <= 0) return null
 
       const explicitKey = resolveCategoryFromCell(rawCategory, cats)
-      const matchText = [product, note, counterparty].filter(Boolean).join(" ")
+      const matchText = [product, remark, counterparty].filter(Boolean).join(" ")
 
       return {
         id: `tx_import_${Date.now()}_${idx}`,
@@ -416,7 +461,7 @@ function rowsToTransactions(
         amount: Math.abs(amount),
         categoryKey: suggestCategory(matchText, type, cats, explicitKey),
         memberId: resolvedMemberId,
-        note: note || product || counterparty,
+        note: product || remark || counterparty,
         createdAt: Date.now() + idx,
       }
     })

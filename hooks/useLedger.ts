@@ -31,6 +31,7 @@ import {
   parseWechatCSV,
   type ImportResult,
 } from "@/lib/importers"
+import { decodeBillCsv } from "@/lib/csv-decode"
 import type {
   AppState,
   Gender,
@@ -623,8 +624,9 @@ export function useLedger() {
       const reader = new FileReader()
       reader.onload = (ev) => {
         try {
-          const text = ev.target!.result as string
-          const source = detectSource(text)
+          const buffer = ev.target!.result as ArrayBuffer
+          const text = decodeBillCsv(buffer)
+          const source = detectSource(text, file.name)
 
           if (source === "alipay" || source === "wechat") {
             const result =
@@ -640,7 +642,7 @@ export function useLedger() {
           toast("文件解析失败，请确认是有效的 CSV 文件")
         }
       }
-      reader.readAsText(file, "UTF-8")
+      reader.readAsArrayBuffer(file)
       e.target.value = ""
       return
     }

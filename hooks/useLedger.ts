@@ -6,6 +6,8 @@ import { SYS_AVATARS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud } from "@/lib/storage"
+import { deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
+import { withRoomLock } from "@/lib/sync-lock"
 import {
   getInTrendData,
   getExpensePie,
@@ -107,12 +109,15 @@ export function useLedger() {
   const [importPreviewTransactions, setImportPreviewTransactions] = useState<Transaction[]>([])
   const [importPreviewRecorder, setImportPreviewRecorder] = useState("")
 
+  const [revertImportOpen, setRevertImportOpen] = useState(false)
+  const [revertImportLoading, setRevertImportLoading] = useState(false)
+
   const fileRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const coupleBgRef = useRef<HTMLInputElement>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { members, goals, activeGoalId, cats, theme, coupleBg, startDate, remindOn, transactions } = state
+  const { members, goals, activeGoalId, cats, theme, coupleBg, startDate, remindOn, transactions, importBatches } = state
 
   useEffect(() => {
     setState(loadState())
@@ -214,6 +219,15 @@ export function useLedger() {
   const filteredFlow = useMemo(
     () => groupByDate(transactions, cats, members, flowFilter === "all" ? undefined : flowFilter),
     [transactions, cats, members, flowFilter]
+  )
+
+  const revertableBatches = useMemo(
+    () =>
+      importBatches
+        .filter((b) => b.status !== "reverted")
+        .sort((a, b) => b.time.localeCompare(a.time))
+        .slice(0, 3),
+    [importBatches]
   )
 
   const flowMonthSummary = useMemo(
@@ -598,6 +612,7 @@ export function useLedger() {
       recorder: importPreviewRecorder,
       count: imported.length,
       time: new Date().toISOString(),
+      status: "active",
     }
     setState((s) => ({
       ...s,
@@ -613,6 +628,60 @@ export function useLedger() {
     toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
     cancelImportPreview()
   }, [importPreviewSource, importPreviewRecorder, cancelImportPreview, toast])
+
+  const openRevertImport = useCallback(() => {
+    setRevertImportOpen(true)
+  }, [])
+
+  const closeRevertImport = useCallback(() => {
+    setRevertImportOpen(false)
+  }, [])
+
+  const revertImportBatch = useCallback(async (batchTime: string) => {
+    const batch = importBatches.find(
+      (b) => b.time === batchTime && b.status !== "reverted"
+    )
+    if (!batch) return
+
+    if (batch.ids.length === 0) {
+      toast("该批次无交易记录")
+      return
+    }
+
+    const idsSet = new Set(batch.ids)
+    const deleteCount = batch.ids.length
+    const updatedBatch: ImportBatch = { ...batch, status: "reverted" }
+
+    setState((s) => ({
+      ...s,
+      transactions: s.transactions.filter((tx) => !idsSet.has(tx.id)),
+      importBatches: s.importBatches.map((b) =>
+        b.time === batchTime ? updatedBatch : b
+      ),
+    }))
+
+    const roomId =
+      state.roomId ||
+      (typeof window !== "undefined" ? localStorage.getItem("couple-room-id") || "" : "")
+
+    if (!useCloud || !roomId) {
+      toast(`已撤销导入，删除 ${deleteCount} 条交易`)
+      return
+    }
+
+    setRevertImportLoading(true)
+    try {
+      await withRoomLock(roomId, async () => {
+        await deleteCloudTransactions(batch.ids, roomId)
+        await pushImportBatches([updatedBatch], roomId)
+      })
+      toast(`已撤销导入，删除 ${deleteCount} 条交易`)
+    } catch {
+      toast("撤销已生效，云同步失败，稍后自动重试")
+    } finally {
+      setRevertImportLoading(false)
+    }
+  }, [importBatches, state.roomId, toast])
 
   const onImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -866,6 +935,12 @@ export function useLedger() {
     importPreviewTransactions,
     cancelImportPreview,
     confirmImportPreview,
+    revertImportOpen,
+    revertImportLoading,
+    revertableBatches,
+    openRevertImport,
+    closeRevertImport,
+    revertImportBatch,
     deleteTransaction,
     exportTransactionsXlsx,
     prevReviewMonth,

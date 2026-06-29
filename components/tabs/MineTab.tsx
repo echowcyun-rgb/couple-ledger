@@ -25,6 +25,7 @@ export function MineTab({
     | "setMemberPageOpen"
     | "fileRef"
     | "onImportFile"
+    | "openRevertImport"
     | "avatarRef"
     | "onAvatarFile"
     | "exportTransactionsXlsx"
@@ -40,7 +41,6 @@ export function MineTab({
     onCoupleBgFile,
     theme,
     setTheme,
-    payday,
     toast,
     goals,
     setGoalOpen,
@@ -49,6 +49,7 @@ export function MineTab({
     setMemberPageOpen,
     fileRef,
     onImportFile,
+    openRevertImport,
     avatarRef,
     onAvatarFile,
     exportTransactionsXlsx,
@@ -145,6 +146,12 @@ export function MineTab({
         <button className="setrow" onClick={() => fileRef.current?.click()}>
           <span className="set-ico s8">入</span><span className="set-label">导入账单</span>
           <span className="set-val">csv / xlsx</span><span className="set-arrow">›</span>
+        </button>
+        <button className="setrow" onClick={openRevertImport}>
+          <span className="set-ico s8" style={{ background: "var(--out)" }}>撤</span>
+          <span className="set-label">撤销导入</span>
+          <span className="set-val">最近 3 次</span>
+          <span className="set-arrow">›</span>
         </button>
         <button className="setrow" onClick={() => toast("俩人记账本 v1.0")}>
           <span className="set-ico s7">关</span><span className="set-label">关于</span>

@@ -97,6 +97,7 @@ export interface ImportBatch {
   recorder: string
   count: number
   time: string
+  status?: "active" | "reverted"
 }
 
 export interface MonthSummary {

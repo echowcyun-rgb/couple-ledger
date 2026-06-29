@@ -1,6 +1,6 @@
 import { createDefaultState, INIT_CATS, STORAGE_KEY } from "./constants"
 import { normalizeCoupleBg } from "./couple-bg"
-import { supabase, useCloud } from "./supabase"
+import { supabase, useCloud, pullImportBatches, pushImportBatches } from "./supabase"
 import { withRoomLock } from "./sync-lock"
 import { withRetry, withTimeout } from "./sync-utils"
 import type { AppState, Goal, Member, Transaction } from "./types"
@@ -251,6 +251,14 @@ async function pushToCloud(state: AppState): Promise<void> {
       supabase!.from("goals").upsert(goalRows, { onConflict: "room_id,id" })
     )
   }
+
+  try {
+    if (state.importBatches.length > 0) {
+      await pushImportBatches(state.importBatches, roomId)
+    }
+  } catch (e) {
+    console.warn("推送导入批次到云端失败:", e)
+  }
 }
 
 /** 从 Supabase 拉取云端数据，与本地合并 */
@@ -343,6 +351,17 @@ export async function syncFromCloud(): Promise<number> {
           localGoals.set(cg.id, cg)
         }
         local.goals = Array.from(localGoals.values())
+      }
+
+      const cloudBatches = await pullImportBatches(roomId)
+      if (cloudBatches.length > 0) {
+        const batchMap = new Map(local.importBatches.map((b) => [b.time, b]))
+        for (const cb of cloudBatches) {
+          batchMap.set(cb.time, cb)
+        }
+        local.importBatches = Array.from(batchMap.values()).sort((a, b) =>
+          b.time.localeCompare(a.time)
+        )
       }
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(local))

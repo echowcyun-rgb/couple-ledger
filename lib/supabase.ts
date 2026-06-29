@@ -160,6 +160,14 @@ export async function deleteCloudTransaction(id: string, roomId: string): Promis
   }
 }
 
+/** 批量删除云端交易（撤销导入用，失败向上抛出） */
+export async function deleteCloudTransactions(ids: string[], roomId: string): Promise<void> {
+  if (!supabase || ids.length === 0) return
+  await runSupabaseVoid(() =>
+    supabase!.from("transactions").delete().in("id", ids).eq("room_id", roomId)
+  )
+}
+
 // ===== 存钱目标同步 =====
 
 export async function pullGoals(roomId: string): Promise<Goal[]> {
@@ -272,12 +280,14 @@ export async function pullImportBatches(roomId: string): Promise<ImportBatch[]> 
     )
     return (data || []).map((b) => {
       const row = b as Record<string, unknown>
+      const status = row.status as ImportBatch["status"] | undefined
       return {
         ids: row.ids as string[],
         source: row.source as ImportBatch["source"],
         recorder: row.recorder as string,
         count: row.count as number,
         time: row.time as string,
+        status: status === "reverted" ? "reverted" : "active",
       }
     })
   } catch (e) {
@@ -296,6 +306,7 @@ export async function pushImportBatches(batches: ImportBatch[], roomId: string):
       recorder: b.recorder,
       count: b.count,
       time: b.time,
+      status: b.status || "active",
     }))
     await runSupabaseVoid(() =>
       supabase!.from("import_batches").upsert(rows, { onConflict: "room_id,time" })
@@ -303,25 +314,21 @@ export async function pushImportBatches(batches: ImportBatch[], roomId: string):
     return true
   } catch (e) {
     console.warn("推送导入批次到云端失败:", e)
-    return false
+    throw e
   }
 }
 
 // ===== 房间管理 =====
 
-/** 验证房号是否存在 */
+/** 验证房号是否存在；网络/超时错误向上抛出，供 RoomSetup 展示 */
 export async function validateRoom(roomId: string): Promise<boolean> {
   if (!supabase) {
     return getLocalRooms().includes(roomId)
   }
-  try {
-    const data = await runSupabase(() =>
-      supabase!.from("couples").select("room_id").eq("room_id", roomId).maybeSingle()
-    )
-    return !!data
-  } catch {
-    return false
-  }
+  const data = await runSupabase(() =>
+    supabase!.from("couples").select("room_id").eq("room_id", roomId).maybeSingle()
+  )
+  return !!data
 }
 
 /** 创建新房间，返回房号 */

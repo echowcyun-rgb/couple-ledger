@@ -13,6 +13,7 @@ import { UpdateGoalSheet } from "@/components/modals/UpdateGoalSheet"
 import { EditGoalSheet } from "@/components/modals/EditGoalSheet"
 import { CoupleBgAdjustSheet } from "@/components/modals/CoupleBgAdjustSheet"
 import { ImportPreviewSheet } from "@/components/modals/ImportPreviewSheet"
+import { RevertImportSheet } from "@/components/modals/RevertImportSheet"
 import { FlowTab } from "@/components/tabs/FlowTab"
 import { HomeTab } from "@/components/tabs/HomeTab"
 import { MineTab } from "@/components/tabs/MineTab"
@@ -82,6 +83,13 @@ export default function Page() {
         cats={ledger.cats}
         onCancel={ledger.cancelImportPreview}
         onConfirm={ledger.confirmImportPreview}
+      />
+      <RevertImportSheet
+        open={ledger.revertImportOpen}
+        batches={ledger.revertableBatches}
+        loading={ledger.revertImportLoading}
+        onClose={ledger.closeRevertImport}
+        onRevert={ledger.revertImportBatch}
       />
 
       <Toast show={ledger.toastShow} msg={ledger.toastMsg} />

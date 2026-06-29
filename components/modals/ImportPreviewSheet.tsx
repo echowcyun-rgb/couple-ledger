@@ -5,7 +5,7 @@ import type { Category, ImportBatch, Transaction } from "@/lib/types"
 import { yuan } from "@/lib/format"
 import { useSheetSwipe } from "@/hooks/useSheetSwipe"
 
-const SOURCE_LABELS: Record<ImportBatch["source"], string> = {
+export const IMPORT_SOURCE_LABELS: Record<ImportBatch["source"], string> = {
   alipay: "支付宝",
   wechat: "微信",
   generic: "通用",
@@ -82,7 +82,7 @@ export function ImportPreviewSheet({
         <div className="import-preview-header">
           <div className="sheet-title">导入预览</div>
           <div className="import-preview-meta">
-            {SOURCE_LABELS[source]} · 共 {rows.length} 条
+            {IMPORT_SOURCE_LABELS[source]} · 共 {rows.length} 条
             {uncategorizedCount > 0 && (
               <span className="import-preview-uncat"> · {uncategorizedCount} 条未分类</span>
             )}

@@ -41,8 +41,10 @@ describe("parseAlipayCSV", () => {
       type: "out",
       amount: 19.4,
       categoryKey: "car",
+      note: "滴滴快车打",
     })
-    expect(result.transactions[0].note).toContain("滴滴")
+    expect(result.transactions[0].note).toHaveLength(5)
     expect(result.transactions[1].categoryKey).toBe("food")
+    expect(result.transactions[1].note).toBe("美团外卖订")
   })
 })

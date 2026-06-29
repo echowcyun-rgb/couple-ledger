@@ -45,6 +45,11 @@ function makeBatch(
   }
 }
 
+/** 备注截取商品说明前 5 字 */
+export function noteFromDesc(desc: string): string {
+  return desc ? desc.slice(0, 5) : ""
+}
+
 function splitBillLines(content: string): string[] {
   return content.split("\n").filter((l) => l.trim())
 }
@@ -167,7 +172,7 @@ export function parseAlipayCSV(
       amount,
       categoryKey: suggestCategory(matchText, type, cats, explicitKey),
       memberId,
-      note: desc || remark || counterparty,
+      note: noteFromDesc(desc),
       createdAt: Date.now() + i,
     })
   }
@@ -250,7 +255,7 @@ export function parseWechatCSV(
       amount,
       categoryKey: suggestCategory(matchText, type, cats, explicitKey),
       memberId,
-      note: desc || remark || counterparty,
+      note: noteFromDesc(desc),
       createdAt: Date.now() + i,
     })
   }
@@ -461,7 +466,7 @@ function rowsToTransactions(
         amount: Math.abs(amount),
         categoryKey: suggestCategory(matchText, type, cats, explicitKey),
         memberId: resolvedMemberId,
-        note: product || remark || counterparty,
+        note: noteFromDesc(product),
         createdAt: Date.now() + idx,
       }
     })

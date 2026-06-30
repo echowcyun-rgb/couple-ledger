@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SYS_AVATARS, INIT_CATS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
-import { loadState, saveState, syncFromCloud } from "@/lib/storage"
+import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState } from "@/lib/storage"
 import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
@@ -159,12 +159,26 @@ export function useLedger() {
   const avatarRef = useRef<HTMLInputElement>(null)
   const coupleBgRef = useRef<HTMLInputElement>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** 初始云同步完成前禁止云端推送，避免空数据覆盖云端 */
+  const allowPushRef = useRef(false)
+  const syncGenerationRef = useRef(0)
 
   const { members, goals, activeGoalId, cats, theme, coupleBg, startDate, remindOn, transactions, importBatches } = state
 
   useEffect(() => {
-    setState(loadState())
-    setHydrated(true)
+    try {
+      const loaded = loadState()
+      const savedRoomId = localStorage.getItem("couple-room-id") || ""
+      if (savedRoomId && loaded.roomId && loaded.roomId !== savedRoomId) {
+        setState(resetLocalStateForRoom(savedRoomId))
+      } else {
+        setState(loaded)
+      }
+    } catch (e) {
+      console.warn("[useLedger] 读取本地数据失败:", e)
+    } finally {
+      setHydrated(true)
+    }
   }, [])
 
   useEffect(() => {
@@ -192,33 +206,103 @@ export function useLedger() {
     return () => window.removeEventListener("ledger-cloud-error", onCloudError)
   }, [toast])
 
-  // 初始化后从云同步，完成后再展示主界面，避免旧本地数据闪现
+  // 后台云同步：不阻塞主界面，同步完成后再允许 saveState
   useEffect(() => {
     if (!hydrated) return
     if (!useCloud) {
+      allowPushRef.current = true
       setCloudSynced(true)
       return
     }
     const roomId = typeof window !== "undefined" ? localStorage.getItem("couple-room-id") : null
     if (!roomId) {
+      allowPushRef.current = true
       setCloudSynced(true)
       return
     }
+
+    allowPushRef.current = false
+    const gen = ++syncGenerationRef.current
+
     syncFromCloud()
       .then((count) => {
+        if (gen !== syncGenerationRef.current) return
         setState(loadState())
         if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
       })
       .catch((e: unknown) => {
+        if (gen !== syncGenerationRef.current) return
         const message = e instanceof Error ? e.message : String(e)
         toast(`云同步失败：${message || "请检查网络"}`)
       })
-      .finally(() => setCloudSynced(true))
+      .finally(() => {
+        if (gen !== syncGenerationRef.current) return
+        allowPushRef.current = true
+        setCloudSynced(true)
+        saveState(loadState(), { push: true })
+      })
   }, [hydrated, toast])
 
   useEffect(() => {
-    if (hydrated) saveState(state)
+    if (!hydrated) return
+    saveState(state, { push: allowPushRef.current })
   }, [state, hydrated])
+
+  const enterRoom = useCallback(async (roomId: string, options?: { fresh?: boolean }) => {
+    syncGenerationRef.current++
+    const gen = syncGenerationRef.current
+    cancelPendingSync()
+    allowPushRef.current = false
+    setCloudSynced(false)
+
+    let fresh = options?.fresh ?? false
+    const local = loadState()
+    if (!fresh && local.roomId && local.roomId !== roomId) {
+      fresh = true
+    }
+
+    localStorage.setItem("couple-room-id", roomId)
+
+    if (fresh) {
+      setState(resetLocalStateForRoom(roomId))
+    } else {
+      const next = { ...loadState(), roomId }
+      flushStateSync(next)
+      setState(next)
+    }
+
+    if (!useCloud) {
+      allowPushRef.current = true
+      setCloudSynced(true)
+      return
+    }
+
+    try {
+      const count = await syncFromCloud()
+      if (gen !== syncGenerationRef.current) return
+      setState(loadState())
+      if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
+    } catch (e: unknown) {
+      if (gen !== syncGenerationRef.current) return
+      const message = e instanceof Error ? e.message : String(e)
+      toast(`云同步失败：${message || "请检查网络"}`)
+    } finally {
+      if (gen !== syncGenerationRef.current) return
+      allowPushRef.current = true
+      setCloudSynced(true)
+      saveState(loadState(), { push: true })
+    }
+  }, [toast])
+
+  const leaveRoom = useCallback(() => {
+    syncGenerationRef.current++
+    cancelPendingSync()
+    allowPushRef.current = false
+    void flushAndPushState(state).finally(() => {
+      localStorage.removeItem("couple-room-id")
+    })
+    setCloudSynced(true)
+  }, [state])
 
   useEffect(() => {
     if (!recMemberId && members.length > 0) setRecMemberId(members[0].id)
@@ -1193,6 +1277,8 @@ export function useLedger() {
     prevReviewMonth,
     nextReviewMonth,
     toast,
+    enterRoom,
+    leaveRoom,
     getInTrendData: (scope: "year" | "month" | "day") =>
       getInTrendData(transactions, members, scope, reviewYear, reviewMonth),
     getOutTrendData: (scope: "year" | "month" | "day") =>

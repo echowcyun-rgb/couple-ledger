@@ -1,7 +1,6 @@
-const CACHE_NAME = "couple-ledger-v25"
+const CACHE_NAME = "couple-ledger-v26"
 
 const LOCAL_ASSETS = [
-  "./",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",
@@ -9,6 +8,13 @@ const LOCAL_ASSETS = [
   "./icon-maskable.png",
   "./apple-touch-icon.png",
 ]
+
+/** Next.js 动态资源不缓存，避免刷新后 JS 不匹配 */
+function shouldCache(url: URL): boolean {
+  if (url.pathname.startsWith("/_next/")) return false
+  if (url.pathname.startsWith("/api/")) return false
+  return LOCAL_ASSETS.some((p) => url.pathname === p.replace("./", "/") || url.pathname.endsWith(p.slice(1)))
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -28,16 +34,9 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
   const url = new URL(event.request.url)
   if (url.origin !== self.location.origin) return
+  if (!shouldCache(url)) return
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== "basic") return response
-        const clone = response.clone()
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
-        return response
-      })
-    })
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
   )
 })

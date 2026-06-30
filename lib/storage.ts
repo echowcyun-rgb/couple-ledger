@@ -184,8 +184,53 @@ let pushTimer: ReturnType<typeof setTimeout> | null = null
 /** 等待执行或正在执行的 push 数量；>3 时在弱网下可能积压 */
 let pushQueueDepth = 0
 
-export function saveState(state: AppState): void {
+/** 取消尚未执行的本地保存与云端推送（换房 / 重进房间前调用） */
+export function cancelPendingSync(): void {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (pushTimer) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
+}
+
+/** 立即写入 localStorage，不触发 debounce */
+export function flushStateSync(state: AppState): void {
+  cancelPendingSync()
   if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    console.warn("localStorage save failed")
+  }
+}
+
+/** 换房或新建账本：清空本地数据并绑定新房号 */
+export function resetLocalStateForRoom(roomId: string): AppState {
+  cancelPendingSync()
+  const fresh = createDefaultState()
+  fresh.roomId = roomId
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh))
+    localStorage.setItem("couple-room-id", roomId)
+  }
+  return fresh
+}
+
+/** 立即落盘并同步到云端（换房间前刷盘） */
+export async function flushAndPushState(state: AppState): Promise<void> {
+  flushStateSync(state)
+  if (!useCloud || !supabase) return
+  const roomId = resolveRoomId(state)
+  if (!roomId) return
+  await withRoomLock(roomId, () => pushToCloud(state))
+}
+
+export function saveState(state: AppState, options?: { push?: boolean }): void {
+  if (typeof window === "undefined") return
+  const shouldPush = options?.push !== false
 
   // 1. 立即写 localStorage（离线可用）
   if (saveTimer) clearTimeout(saveTimer)
@@ -197,28 +242,28 @@ export function saveState(state: AppState): void {
     }
   }, 300)
 
-  // 2. 异步推送到云（用户无感，debounce 1s 不变）
-  if (useCloud) {
-    if (pushTimer) clearTimeout(pushTimer)
-    pushTimer = setTimeout(() => {
-      const roomId = resolveRoomId(state)
-      if (!roomId) return
+  // 2. 云推送可延迟（初始同步完成前禁止，避免空数据覆盖云端）
+  if (!shouldPush || !useCloud) return
 
-      pushQueueDepth++
-      if (pushQueueDepth > 3) {
-        console.warn("[sync] push 排队超过 3，可能在弱网或频繁编辑下积压")
-      }
+  if (pushTimer) clearTimeout(pushTimer)
+  pushTimer = setTimeout(() => {
+    const roomId = resolveRoomId(state)
+    if (!roomId) return
 
-      withRoomLock(roomId, () => pushToCloud(state))
-        .catch((e: unknown) => {
-          const message = e instanceof Error ? e.message : String(e)
-          emitCloudError(formatCloudSyncError(message))
-        })
-        .finally(() => {
-          pushQueueDepth--
-        })
-    }, 1000)
-  }
+    pushQueueDepth++
+    if (pushQueueDepth > 3) {
+      console.warn("[sync] push 排队超过 3，可能在弱网或频繁编辑下积压")
+    }
+
+    withRoomLock(roomId, () => pushToCloud(state))
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e)
+        emitCloudError(formatCloudSyncError(message))
+      })
+      .finally(() => {
+        pushQueueDepth--
+      })
+  }, 1000)
 }
 
 // ===== 云同步 =====

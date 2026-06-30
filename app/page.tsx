@@ -25,11 +25,13 @@ function paydayAlertStorageKey() {
   return `payday-alerted-${new Date().toDateString()}`
 }
 
-const ROOM_ENTERED_KEY = "couple-room-entered"
+function hasSavedRoom() {
+  return typeof window !== "undefined" && !!localStorage.getItem("couple-room-id")
+}
 
 export default function Page() {
   const ledger = useLedger()
-  const [showSetup, setShowSetup] = useState(false)
+  const [showSetup, setShowSetup] = useState(() => !hasSavedRoom())
   const [showPaydayAlert, setShowPaydayAlert] = useState(false)
 
   const dismissPaydayAlert = () => {
@@ -37,36 +39,37 @@ export default function Page() {
     setShowPaydayAlert(false)
   }
 
-  // 每个浏览器会话首次打开先显示 RoomSetup；用户进入账本后本会话不再重复弹出
   useEffect(() => {
-    if (ledger.hydrated && !sessionStorage.getItem(ROOM_ENTERED_KEY)) {
+    if (ledger.hydrated && !hasSavedRoom()) {
       setShowSetup(true)
     }
   }, [ledger.hydrated])
 
   useEffect(() => {
-    if (!ledger.hydrated || !ledger.cloudSynced || ledger.members.length === 0) return
+    if (!ledger.hydrated || ledger.members.length === 0) return
     const today = new Date().getDate()
     const isAnyPayday = ledger.members.some((m) => m.payday === today)
     if (isAnyPayday && !sessionStorage.getItem(paydayAlertStorageKey())) {
       setShowPaydayAlert(true)
     }
-  }, [ledger.hydrated, ledger.cloudSynced, ledger.members])
+  }, [ledger.hydrated, ledger.members])
 
-  if (showSetup) {
-    return <RoomSetup onDone={(roomId) => {
-      localStorage.setItem("couple-room-id", roomId)
-      sessionStorage.setItem(ROOM_ENTERED_KEY, "1")
-      setShowSetup(false)
-      window.location.reload()
-    }} />
-  }
-
-  if (!ledger.hydrated || !ledger.cloudSynced) {
+  if (!ledger.hydrated) {
     return (
       <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <span style={{ fontFamily: "var(--font-pixel-cjk), monospace", fontSize: 12 }}>加载中...</span>
       </div>
+    )
+  }
+
+  if (showSetup) {
+    return (
+      <RoomSetup
+        onDone={(roomId, fresh) => {
+          setShowSetup(false)
+          void ledger.enterRoom(roomId, { fresh })
+        }}
+      />
     )
   }
 
@@ -77,6 +80,10 @@ export default function Page() {
       className="app"
       style={{ "--accent": t.accent, "--accent-dark": t.accentDark } as React.CSSProperties}
     >
+      {!ledger.cloudSynced && (
+        <div className="sync-banner" role="status">云同步中…</div>
+      )}
+
       {ledger.tab === "home" && <HomeTab ledger={ledger} />}
       {ledger.tab === "flow" && <FlowTab ledger={ledger} />}
       {ledger.tab === "review" && <ReviewTab ledger={ledger} />}
@@ -85,6 +92,10 @@ export default function Page() {
           ledger={ledger}
           onSelectImportMember={ledger.onSelectImportMember}
           onSelectExportMember={ledger.onSelectExportMember}
+          onSwitchRoom={() => {
+            ledger.leaveRoom()
+            setShowSetup(true)
+          }}
         />
       )}
 

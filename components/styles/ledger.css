@@ -788,6 +788,21 @@
 .app .import-preview-empty { padding: 24px 16px; text-align: center; font-size: 11px; color: var(--text-sub); }
 .app .import-preview-actions { display: flex; gap: 10px; }
 .app .import-preview-actions .px-btn { flex: 1; text-align: center; padding: 12px; }
+
+.app .sync-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  padding: 6px;
+  text-align: center;
+  font-size: 10px;
+  font-family: var(--font-pixel-cjk), monospace;
+  color: var(--text-sub);
+  background: rgba(255, 248, 240, 0.92);
+  border-bottom: 2px solid var(--ink);
+}
 .app .import-confirm-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: calc(100% - 40px); max-width: 320px; background: var(--card); border: 4px solid var(--ink); border-radius: 14px; padding: 20px 16px; z-index: 97; box-shadow: 6px 6px 0 var(--ink); }
 .app .import-confirm-text { font-size: 11px; color: var(--text-sub); margin: 0 0 16px; line-height: 1.5; }
 
@@ -865,16 +880,13 @@
   margin-bottom: 36px;
   image-rendering: pixelated;
 }
-.app .room-setup-existing { display: block; width: 100%; max-width: 320px; padding: 16px; margin-bottom: 16px; background: var(--card); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 4px 4px 0 var(--ink); cursor: pointer; transition: transform .08s steps(2); text-align: left; }
-.app .room-setup-existing:active { transform: translate(2px, 2px); box-shadow: none; }
-.app .room-setup-existing-title { font-family: var(--font-pixel-cjk), monospace; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
-.app .room-setup-existing-hint { font-family: var(--font-pixel-cjk), monospace; font-size: 10px; color: var(--text-sub); }
 .app .room-setup-actions {
   width: 100%;
   max-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  margin-top: 24px;
 }
 .app .room-setup-btn {
   width: 100%;
@@ -897,6 +909,7 @@
   box-shadow: 0 0 0 var(--ink);
 }
 .app .room-setup-btn.green { background: #6BBF8A; }
+.app .room-setup-btn.rose { background: #D96A7E; }
 .app .room-setup-btn.amber { background: #F0A03C; }
 .app .room-setup-btn:disabled { opacity: .5; cursor: not-allowed; }
 .app .room-setup-ico {
@@ -916,6 +929,7 @@
   font-family: var(--font-pixel-cjk), monospace;
   font-size: 13px;
   font-weight: 700;
+  color: #fff;
 }
 .app .room-setup-btn-text small {
   font-family: var(--font-pixel-cjk), monospace;

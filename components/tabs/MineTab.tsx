@@ -8,6 +8,7 @@ export function MineTab({
   ledger,
   onSelectImportMember,
   onSelectExportMember,
+  onSwitchRoom,
 }: {
   ledger: Pick<
     Ledger,
@@ -35,6 +36,7 @@ export function MineTab({
   >
   onSelectImportMember: (memberId: string) => void
   onSelectExportMember: (memberId: string) => void
+  onSwitchRoom: () => void
 }) {
   const {
     coupleDays,
@@ -192,8 +194,8 @@ export function MineTab({
                 className="px-btn solid"
                 style={{ flex: 1 }}
                 onClick={() => {
-                  localStorage.removeItem("couple-room-id")
-                  window.location.reload()
+                  setConfirmSwitch(false)
+                  onSwitchRoom()
                 }}
               >
                 确认换房间

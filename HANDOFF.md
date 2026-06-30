@@ -1,10 +1,10 @@
 # Cursor 对话交接 - 情侣记账 PWA
 
-> 更新时间：2026-06-30（第四轮对话）
+> 更新时间：2026-06-30（第五轮对话）
 
 ## 项目信息
 - 路径：~/Documents/记账app/-pwav1-移植版
-- 分支：main（本地 ahead of origin/main 3 commits，含优化 12–14 未推送）
+- 分支：main（本地 ahead of origin/main，含优化 12–18 未推送）
 - 生产地址：https://couple-ledger.vercel.app（当前线上为优化 11 版本）
 - GitHub：https://github.com/echowcyun-rgb/couple-ledger
 - 技术栈：Next.js 16.2.6 + Turbopack + React 19 + TypeScript 5.7 + Tailwind 4 + Supabase + @e965/xlsx + async-mutex + vitest
@@ -19,7 +19,7 @@
 - xlsx 漏洞修复（@e965/xlsx 替换高危 xlsx）
 - Supabase 同步竞态+超时（async-mutex + withTimeout 10s + withRetry 指数退避）
 - TypeScript 类型错误修复（构建启用 TS 校验）
-- ESLint flat config + vitest 接入（32 tests passed）
+- ESLint flat config + vitest 接入（35 tests passed）
 - 5 张表（couples/members/transactions/goals/import_batches）RLS 已全部 DISABLE
 
 ### 优化 1-8 摘要
@@ -38,7 +38,7 @@
 - 单条 deleteTransaction 补云端删除
 - 成员 2→4 重复 bug（reconcileMembers + pushToCloud 先删后写）
 
-## 本轮新完成的优化（9-14）
+## 已完成优化（9-18）
 
 ### 优化 9：头像性别分组 + 我的界面布局 + 新版账本入口
 - commit: `d9f0e85`
@@ -54,21 +54,48 @@
 - `flowDateMode`（month | day | range）
 
 ### 优化 12：移除外部依赖（不开代理也能访问）
-- commit: `fd9e448`（本地，未推送）
+- commit: `fd9e448`
 - `next/font/local` + `public/fonts/` 四字体本地托管
 - 移除 `@vercel/analytics`
 
 ### 优化 13：理财数据统计
-- commit: `fd9e448`（本地，未推送）
+- commit: `fd9e448`
 - 理财子分类 `categoryKey="finance"`，首页 5 格总览、存钱「当月理财收入」模式、复盘理财趋势
 
-### 优化 14：滚轮日期选择 + 复盘配色 + 强制跳转创建账本
-- 改动：
-  - `FlowDateSheet.tsx`：年月选择改为 `WheelPicker` 滚轮（中间紫色高亮栏 + 滑动吸附）
-  - `ledger.css`：`.wheel-picker` 滚轮样式；大额提醒背景 `#E8C547`、文字 `#5D2A1A`
-  - `app/page.tsx`：每次打开 App 先显示 RoomSetup
-  - `RoomSetup.tsx`：localStorage 有房间号时显示「进入账本 #xxxx」快捷入口
-- `npm run build` 已通过（2026-06-30 验证）
+### 优化 14：滚轮日期选择 + 复盘配色 + RoomSetup 快捷入口
+- commit: `fff51b0`
+- `FlowDateSheet.tsx`：年月选择改为 `WheelPicker` 滚轮
+- `ledger.css`：滚轮样式；大额提醒背景 `#E8C547`、文字 `#5D2A1A`
+- `RoomSetup.tsx`：localStorage 有房间号时显示「进入账本 #xxxx」
+
+### 优化 15：导入查重 + PWA 图标 + RoomSetup 进房修复
+- commit: `e483c96`
+- **导入查重**：`lib/import-dedup.ts` + `ImportPreviewSheet` 按 date/type/amount 标记重复，灰色显示，可跳过，全部重复 toast 拦截
+- **PWA 图标**：`icon-192/512/maskable.png`、`apple-touch-icon.png`、`manifest.json`、`public/sw.js`、`PwaRegister.tsx`
+- **进房修复**：`sessionStorage` 标记本会话已进入，避免 reload 后反复卡在 RoomSetup
+
+### 优化 16：房间切换与云同步重构（去 reload、本地先显示）
+- commit: `49e1569`
+- **问题**：换房/创建账本 `window.location.reload()` 卡顿；空数据在同步前 push 覆盖云端；调试刷新数据不同步
+- **改动**：
+  - `hooks/useLedger.ts`：`enterRoom()` / `leaveRoom()` 内存切换，无全页 reload
+  - `lib/storage.ts`：`cancelPendingSync`、`flushStateSync`、`resetLocalStateForRoom`、`flushAndPushState`；`saveState(state, { push })` 分离本地保存与云推送
+  - `app/page.tsx`：有房间号自动进首页；云同步后台进行，顶部「云同步中…」横幅；换房间走 `leaveRoom` + RoomSetup
+  - `MineTab.tsx`：换房间不再 reload
+- 初始云同步完成前禁止云推送，避免空数据覆盖云端
+
+### 优化 17：开发环境 SW 修复（刷新卡在「加载中」）
+- commit: `49e1569`
+- **根因**：Service Worker 在 dev 缓存旧版 `_next` JS，React 无法 hydration
+- **改动**：
+  - `PwaRegister.tsx`：开发模式自动 `unregister` 所有 SW；生产环境才注册
+  - `public/sw.js` v26：仅缓存 manifest/图标，不缓存 `/` 与 `/_next/*`
+  - `useLedger` hydration 加 try/finally，读取失败也不卡加载
+
+### 优化 18：RoomSetup「进入账本」玫粉样式 + 三按钮等距
+- commit: `49e1569`
+- `RoomSetup.tsx`：「进入账本」并入 `room-setup-actions`，与创建/加入同结构
+- `ledger.css`：`.room-setup-btn.rose` 背景 `#D96A7E`；三按钮统一 `gap: 16px`；操作区 `margin-top: 24px` 下移
 
 ### Supabase 需用户手动执行（背景图云同步）
 ```sql
@@ -81,50 +108,56 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_y TEXT DEFAULT 'cente
 - Vercel 项目：**couple-ledger**（echowcyun-3364s-projects）
 - 生产 URL：https://couple-ledger.vercel.app
 - 线上最新部署：commit `f948729`（优化 11），状态 READY
-- 本地待推送：`fd9e448` + `cd90c98` + `fff51b0`（优化 12–14），推送后 Vercel 自动部署
+- 本地待推送：优化 12–18 全部 commit，执行 `git push origin main` 后 Vercel 自动部署
 - 部署方式：`git push origin main`（见 `Vercel部署指令.md`）
 
 ## 最近 commit 记录
 ```
+49e1569 feat: 优化16-18 — 房间切换重构、SW 修复、RoomSetup 玫粉等距
+e483c96 feat: 导入查重、PWA 图标与 RoomSetup 进入修复
+9a1431e chore(docs): 清理冗余 Cursor 指令与交接文档，统一以 HANDOFF 为准
 fff51b0 feat(ui): 优化14 — 滚轮日期选择、复盘配色与强制跳转 RoomSetup
-cd90c98 docs: 更新 HANDOFF — 优化9-13 进度、Vercel 部署状态与待办
 fd9e448 feat: 优化9-13 全部完成（头像分组/背景图同步/日期重构/移除外部依赖/理财统计）
 f948729 feat(ui): 优化11 — 流水日期下拉弹窗，支持月份与自定义区间筛选
 ```
 
 ## 文档说明
-- 项目交接以 **`HANDOFF.md`** 为唯一入口（优化 1–14 进度已汇总）
+- 项目交接以 **`HANDOFF.md`** 为唯一入口（优化 1–18 进度已汇总）
 - 部署步骤见 **`Vercel部署指令.md`**
-- 历史 Cursor 指令 / 对话交接 markdown 已清理，避免与 HANDOFF 重复
 
 ## 待办事项
-- `git push origin main` 推送优化 12–14 到 GitHub / Vercel
+- `git push origin main` 推送优化 12–18 到 GitHub / Vercel
 - 确认 Supabase couples 表已加 couple_bg 三列并测试切换房间后背景图保留
+- 若 dev 刷新仍异常：DevTools → Application → Service Workers → Unregister，再硬刷新
 
 ## 关键文件清单
 - `lib/constants.ts` — TABS、INIT_CATS（含 finance）、SYS_AVATARS_FEMALE/MALE
 - `lib/types.ts` — MonthSummary.financeIncome
 - `lib/stats.ts` — getMonthSummary、getFinanceTrendData
-- `hooks/useLedger.ts` — flowDateMode、理财分类合并、saveUpdateGoal finance 模式
-- `app/layout.tsx` — 本地字体（next/font/local）
-- `app/page.tsx` — 启动时强制 RoomSetup
-- `components/modals/FlowDateSheet.tsx` — 流水日期滚轮弹窗（WheelPicker）
-- `components/modals/RoomSetup.tsx` — 创建/加入账本 +「进入已有账本」
-- `components/modals/UpdateGoalSheet.tsx` — 存钱更新（含当月理财收入）
-- `components/tabs/FlowTab.tsx` — 流水（日期下拉 + 理财筛选）
-- `components/tabs/HomeTab.tsx` — 首页（5 格总览含理财）
-- `components/tabs/ReviewTab.tsx` — 复盘（理财趋势 + 大额消费提示）
-- `components/styles/ledger.css` — 全局样式（滚轮/理财/room-setup-existing）
+- `lib/storage.ts` — saveState/push 分离、换房 flush、syncFromCloud
+- `lib/import-dedup.ts` — 导入三元组查重
+- `hooks/useLedger.ts` — enterRoom/leaveRoom、flowDateMode、理财分类
+- `app/layout.tsx` — 本地字体、PWA metadata
+- `app/page.tsx` — RoomSetup 路由、云同步横幅
+- `components/PwaRegister.tsx` — SW 注册（仅生产）
+- `components/modals/FlowDateSheet.tsx` — 流水日期滚轮弹窗
+- `components/modals/RoomSetup.tsx` — 创建/加入/进入账本（玫粉快捷入口）
+- `components/modals/ImportPreviewSheet.tsx` — 导入预览 + 查重
+- `components/tabs/MineTab.tsx` — 换房间（无 reload）
+- `components/styles/ledger.css` — 全局样式（room-setup/sw banner）
+- `public/manifest.json`、`public/sw.js`、PWA PNG 图标
 - `public/fonts/` — 4 个本地 woff2 字体
 - `.env.local` — Supabase 环境变量
 
 ## 注意事项
 - 主开发目录是 `-pwav1-移植版`
 - `.env.local` 不会随 git 推送，Vercel 需手动配置环境变量
-- 每次打开链接会先进入 RoomSetup；有已存房间号可点「进入账本 #xxxx」一键进入
+- 有已存房间号时自动进首页；无房间或「换房间」时显示 RoomSetup
+- RoomSetup 三按钮：进入（玫粉）/ 创建（绿）/ 加入（橙），等距 16px
 - 理财记账：选「收入 → 理财」，不是独立 TxType
 - 结余公式：`balance = income - expense - savings`（理财已含在 income 内）
-- `npm run build` 已通过（2026-06-30 验证）
+- dev 环境不注册 SW；生产 PWA 安装需 HTTPS
+- `npm run build` + `npm test`（35 passed）已通过（2026-06-30 验证）
 
 ## 新对话继续方式
 开新对话时说：**「读 HANDOFF.md 继续工作」**

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createRoom, validateRoom, isCloudReady } from "@/lib/supabase"
 
 interface Props {
-  onDone: (roomId: string) => void
+  onDone: (roomId: string, fresh?: boolean) => void
 }
 
 function roomSetupErrorMessage(e: unknown, fallback: string): string {
@@ -70,9 +70,7 @@ export default function RoomSetup({ onDone }: Props) {
         )
         return
       }
-      localStorage.removeItem("couple-ledger-v1")
-      localStorage.setItem("couple-room-id", code)
-      onDone(code)
+      onDone(code, true)
     } catch (e) {
       console.warn("[RoomSetup] 加入账本失败:", e)
       setError(roomSetupErrorMessage(e, "验证失败，网络异常，请检查连接后重试"))
@@ -82,9 +80,7 @@ export default function RoomSetup({ onDone }: Props) {
   }
 
   const handleStartUsing = () => {
-    localStorage.removeItem("couple-ledger-v1")
-    localStorage.setItem("couple-room-id", createdRoom)
-    onDone(createdRoom)
+    onDone(createdRoom, true)
   }
 
   return (
@@ -112,18 +108,24 @@ export default function RoomSetup({ onDone }: Props) {
             </div>
           </div>
 
-          {existingRoom && (
-            <button
-              type="button"
-              className="room-setup-existing"
-              onClick={() => onDone(existingRoom)}
-            >
-              <div className="room-setup-existing-title">进入账本 #{existingRoom}</div>
-              <div className="room-setup-existing-hint">点击继续使用上次账本</div>
-            </button>
-          )}
-
           <div className="room-setup-actions">
+            {existingRoom && (
+              <button
+                type="button"
+                className="room-setup-btn rose"
+                onClick={() => onDone(existingRoom, false)}
+              >
+                <span className="room-setup-ico">
+                  <PixelEnter />
+                </span>
+                <span className="room-setup-btn-text">
+                  <strong>进入账本 #{existingRoom}</strong>
+                  <small>点击继续使用上次账本</small>
+                </span>
+                <PixelArrow />
+              </button>
+            )}
+
             <button className="room-setup-btn green" onClick={handleCreate} disabled={loading} type="button">
               <span className="room-setup-ico">
                 <PixelPlus />
@@ -259,6 +261,16 @@ function PixelKey() {
       <rect x="3" y="4" width="4" height="1" fill="white" />
       <rect x="5" y="5" width="1" height="1" fill="white" />
       <rect x="3" y="5" width="1" height="1" fill="white" />
+    </svg>
+  )
+}
+
+function PixelEnter() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="1" width="6" height="6" fill="none" stroke="white" strokeWidth="1" />
+      <rect x="3" y="4" width="2" height="3" fill="white" />
+      <rect x="5" y="2" width="1" height="2" fill="white" />
     </svg>
   )
 }

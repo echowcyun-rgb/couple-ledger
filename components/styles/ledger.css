@@ -768,6 +768,11 @@
 .app .import-preview-header { margin-bottom: 10px; }
 .app .import-preview-header .sheet-title { margin-bottom: 4px; }
 .app .import-preview-meta { font-size: 10px; color: var(--text-sub); }
+.app .import-preview-dup { color: #888; }
+.app .import-preview-skip-dup { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; cursor: pointer; }
+.app .import-preview-skip-dup input { vertical-align: middle; }
+.app .import-preview-row-dup { background: #F0F0F0; opacity: 0.55; }
+.app .import-preview-dup-tag { font-size: 9px; color: #888; }
 .app .import-preview-uncat { color: var(--out); }
 .app .import-preview-table-wrap { overflow-x: auto; margin-bottom: 14px; border: 3px solid var(--ink); border-radius: 10px; background: var(--card); }
 .app .import-preview-table { width: 100%; border-collapse: collapse; font-size: 10px; }

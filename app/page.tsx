@@ -25,6 +25,8 @@ function paydayAlertStorageKey() {
   return `payday-alerted-${new Date().toDateString()}`
 }
 
+const ROOM_ENTERED_KEY = "couple-room-entered"
+
 export default function Page() {
   const ledger = useLedger()
   const [showSetup, setShowSetup] = useState(false)
@@ -35,8 +37,9 @@ export default function Page() {
     setShowPaydayAlert(false)
   }
 
+  // 每个浏览器会话首次打开先显示 RoomSetup；用户进入账本后本会话不再重复弹出
   useEffect(() => {
-    if (ledger.hydrated) {
+    if (ledger.hydrated && !sessionStorage.getItem(ROOM_ENTERED_KEY)) {
       setShowSetup(true)
     }
   }, [ledger.hydrated])
@@ -53,6 +56,7 @@ export default function Page() {
   if (showSetup) {
     return <RoomSetup onDone={(roomId) => {
       localStorage.setItem("couple-room-id", roomId)
+      sessionStorage.setItem(ROOM_ENTERED_KEY, "1")
       setShowSetup(false)
       window.location.reload()
     }} />
@@ -102,9 +106,11 @@ export default function Page() {
         open={ledger.importPreviewOpen}
         source={ledger.importPreviewSource}
         transactions={ledger.importPreviewTransactions}
+        existingTransactions={ledger.transactions}
         cats={ledger.cats}
         onCancel={ledger.cancelImportPreview}
         onConfirm={ledger.confirmImportPreview}
+        onToast={ledger.toast}
       />
       <RevertImportSheet
         open={ledger.revertImportOpen}

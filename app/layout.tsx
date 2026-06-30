@@ -1,6 +1,7 @@
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
+import { PwaRegister } from '@/components/PwaRegister'
 import './globals.css'
 
 const geistSans = localFont({
@@ -28,37 +29,27 @@ const dotGothic = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: '情侣记账',
+  description: '情侣一起记账',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: '情侣记账',
+  },
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/apple-touch-icon.png',
   },
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
   maximumScale: 1,
   userScalable: false,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  themeColor: '#2B2440',
 }
 
 export default function RootLayout({
@@ -72,6 +63,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${pressStart.variable} ${dotGothic.variable}`}
     >
       <body className="font-sans antialiased" style={{ background: "#2B2440" }}>
+        <PwaRegister />
         <Script src="/js/income-watch.js" strategy="afterInteractive" />
         {children}
       </body>

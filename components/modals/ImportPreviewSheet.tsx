@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import type { Category, ImportBatch, Transaction } from "@/lib/types"
 import { yuan } from "@/lib/format"
+import { markImportDuplicates } from "@/lib/import-dedup"
 import { useSheetSwipe } from "@/hooks/useSheetSwipe"
 
 export const IMPORT_SOURCE_LABELS: Record<ImportBatch["source"], string> = {
@@ -11,37 +12,52 @@ export const IMPORT_SOURCE_LABELS: Record<ImportBatch["source"], string> = {
   generic: "通用",
 }
 
+type PreviewRow = Transaction & { isDuplicate: boolean }
+
 interface Props {
   open: boolean
   source: ImportBatch["source"]
   transactions: Transaction[]
+  existingTransactions: Transaction[]
   cats: Category[]
   onCancel: () => void
   onConfirm: (transactions: Transaction[]) => void
+  onToast: (msg: string) => void
 }
 
 export function ImportPreviewSheet({
   open,
   source,
   transactions,
+  existingTransactions,
   cats,
   onCancel,
   onConfirm,
+  onToast,
 }: Props) {
-  const [rows, setRows] = useState<Transaction[]>([])
+  const [rows, setRows] = useState<PreviewRow[]>([])
+  const [skipDuplicate, setSkipDuplicate] = useState(true)
   const [confirmUncategorized, setConfirmUncategorized] = useState(false)
   const swipe = useSheetSwipe(onCancel, open)
 
   useEffect(() => {
     if (open) {
-      setRows(transactions.map((t) => ({ ...t })))
+      setRows(markImportDuplicates(transactions, existingTransactions))
+      setSkipDuplicate(true)
       setConfirmUncategorized(false)
     }
-  }, [open, transactions])
+  }, [open, transactions, existingTransactions])
+
+  const duplicateCount = useMemo(() => rows.filter((t) => t.isDuplicate).length, [rows])
+
+  const importableRows = useMemo(
+    () => (skipDuplicate ? rows.filter((t) => !t.isDuplicate) : rows),
+    [rows, skipDuplicate]
+  )
 
   const uncategorizedCount = useMemo(
-    () => rows.filter((t) => !t.categoryKey).length,
-    [rows]
+    () => importableRows.filter((t) => !t.categoryKey).length,
+    [importableRows]
   )
 
   function updateCategory(id: string, categoryKey: string) {
@@ -54,18 +70,24 @@ export function ImportPreviewSheet({
     setRows((prev) => prev.filter((t) => t.id !== id))
   }
 
+  function submitImport() {
+    const payload = importableRows.map(({ isDuplicate: _, ...t }) => t)
+    onConfirm(payload)
+    setConfirmUncategorized(false)
+  }
+
   function handleConfirmClick() {
     if (rows.length === 0) return
+    if (skipDuplicate && rows.length > 0 && rows.every((t) => t.isDuplicate)) {
+      onToast("请勿导入重复账单！")
+      return
+    }
+    if (importableRows.length === 0) return
     if (uncategorizedCount > 0) {
       setConfirmUncategorized(true)
       return
     }
-    onConfirm(rows)
-  }
-
-  function handleForceConfirm() {
-    onConfirm(rows)
-    setConfirmUncategorized(false)
+    submitImport()
   }
 
   function catsForType(type: Transaction["type"]) {
@@ -87,10 +109,23 @@ export function ImportPreviewSheet({
           <div className="sheet-title">导入预览</div>
           <div className="import-preview-meta">
             {IMPORT_SOURCE_LABELS[source]} · 共 {rows.length} 条
+            {duplicateCount > 0 && (
+              <span className="import-preview-dup"> · 检测到 {duplicateCount} 条可能重复</span>
+            )}
             {uncategorizedCount > 0 && (
               <span className="import-preview-uncat"> · {uncategorizedCount} 条未分类</span>
             )}
           </div>
+          {duplicateCount > 0 && (
+            <label className="import-preview-skip-dup">
+              <input
+                type="checkbox"
+                checked={skipDuplicate}
+                onChange={(e) => setSkipDuplicate(e.target.checked)}
+              />
+              跳过重复
+            </label>
+          )}
         </div>
 
         <div className="import-preview-table-wrap">
@@ -109,8 +144,11 @@ export function ImportPreviewSheet({
             </thead>
             <tbody>
               {rows.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.date.slice(5)}</td>
+                <tr key={t.id} className={t.isDuplicate ? "import-preview-row-dup" : undefined}>
+                  <td>
+                    {t.isDuplicate && <span className="import-preview-dup-tag">⚠️ 重复 </span>}
+                    {t.date.slice(5)}
+                  </td>
                   <td>{yuan(t.amount)}</td>
                   <td>
                     <select
@@ -152,7 +190,7 @@ export function ImportPreviewSheet({
             取消
           </button>
           <button type="button" className="px-btn solid" onClick={handleConfirmClick}>
-            确认导入 {rows.length} 条
+            确认导入 {importableRows.length} 条
           </button>
         </div>
       </div>
@@ -169,7 +207,7 @@ export function ImportPreviewSheet({
               <button type="button" className="px-btn ghost" onClick={() => setConfirmUncategorized(false)}>
                 返回修改
               </button>
-              <button type="button" className="px-btn solid" onClick={handleForceConfirm}>
+              <button type="button" className="px-btn solid" onClick={submitImport}>
                 继续导入
               </button>
             </div>

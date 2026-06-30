@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SYS_AVATARS } from "@/lib/constants"
-import { coupleDaysFrom, shiftDate, shiftMonth } from "@/lib/format"
+import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud } from "@/lib/storage"
 import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
@@ -111,7 +111,10 @@ export function useLedger() {
   const [newCatType, setNewCatType] = useState<TxType>("out")
 
   const [flowFilter, setFlowFilter] = useState<"all" | string>("all")
-  const [flowViewMode, setFlowViewMode] = useState<"month" | "day">("month")
+  const [flowDateSheetOpen, setFlowDateSheetOpen] = useState(false)
+  const [flowDateMode, setFlowDateMode] = useState<"month" | "day" | "range">("month")
+  const [flowRangeStart, setFlowRangeStart] = useState("")
+  const [flowRangeEnd, setFlowRangeEnd] = useState("")
   const [flowDate, setFlowDate] = useState(() => new Date().toISOString().slice(0, 10))
 
   const [recordOpen, setRecordOpen] = useState(false)
@@ -264,7 +267,8 @@ export function useLedger() {
     () =>
       groupByDate(
         transactions.filter((t) => {
-          if (flowViewMode === "day") return t.date === flowDate
+          if (flowDateMode === "day") return t.date === flowDate
+          if (flowDateMode === "range") return t.date >= flowRangeStart && t.date <= flowRangeEnd
           const d = new Date(t.date + "T12:00:00")
           const [y, m] = flowDate.split("-").map(Number)
           return d.getFullYear() === y && d.getMonth() + 1 === m
@@ -273,32 +277,8 @@ export function useLedger() {
         members,
         flowFilter === "all" ? undefined : flowFilter
       ),
-    [transactions, cats, members, flowFilter, flowDate, flowViewMode]
+    [transactions, cats, members, flowFilter, flowDate, flowDateMode, flowRangeStart, flowRangeEnd]
   )
-
-  const prevFlowDay = useCallback(() => {
-    setFlowDate((d) => shiftDate(d, -1))
-  }, [])
-
-  const nextFlowDay = useCallback(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    setFlowDate((d) => {
-      const next = shiftDate(d, 1)
-      return next > today ? d : next
-    })
-  }, [])
-
-  const prevFlowMonth = useCallback(() => {
-    setFlowDate((d) => shiftMonth(d, -1))
-  }, [])
-
-  const nextFlowMonth = useCallback(() => {
-    const todayYm = new Date().toISOString().slice(0, 7)
-    setFlowDate((d) => {
-      const next = shiftMonth(d, 1)
-      return next.slice(0, 7) > todayYm ? d : next
-    })
-  }, [])
 
   const revertableBatches = useMemo(
     () =>
@@ -1090,14 +1070,16 @@ export function useLedger() {
     setNewCatType,
     flowFilter,
     setFlowFilter,
-    flowViewMode,
-    setFlowViewMode,
+    flowDateSheetOpen,
+    setFlowDateSheetOpen,
+    flowDateMode,
+    setFlowDateMode,
+    flowRangeStart,
+    setFlowRangeStart,
+    flowRangeEnd,
+    setFlowRangeEnd,
     flowDate,
     setFlowDate,
-    prevFlowDay,
-    nextFlowDay,
-    prevFlowMonth,
-    nextFlowMonth,
     filteredFlow,
     recordOpen,
     setRecordOpen,

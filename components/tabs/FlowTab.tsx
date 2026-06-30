@@ -1,4 +1,5 @@
 import { formatFlowDate, formatFlowDateLabel, formatFlowMonthLabel, yuan } from "@/lib/format"
+import { FlowDateSheet } from "@/components/modals/FlowDateSheet"
 import type { Ledger } from "@/hooks/useLedger"
 import { useState, useRef } from "react"
 
@@ -6,14 +7,16 @@ export function FlowTab({
   ledger,
 }: {
   ledger: Pick<Ledger,
-    | "flowViewMode"
-    | "setFlowViewMode"
+    | "flowDateSheetOpen"
+    | "setFlowDateSheetOpen"
+    | "flowDateMode"
+    | "setFlowDateMode"
+    | "flowRangeStart"
+    | "setFlowRangeStart"
+    | "flowRangeEnd"
+    | "setFlowRangeEnd"
     | "flowDate"
     | "setFlowDate"
-    | "prevFlowDay"
-    | "nextFlowDay"
-    | "prevFlowMonth"
-    | "nextFlowMonth"
     | "flowFilter"
     | "setFlowFilter"
     | "members"
@@ -26,14 +29,16 @@ export function FlowTab({
   >
 }) {
   const {
-    flowViewMode,
-    setFlowViewMode,
+    flowDateSheetOpen,
+    setFlowDateSheetOpen,
+    flowDateMode,
+    setFlowDateMode,
+    flowRangeStart,
+    setFlowRangeStart,
+    flowRangeEnd,
+    setFlowRangeEnd,
     flowDate,
     setFlowDate,
-    prevFlowDay,
-    nextFlowDay,
-    prevFlowMonth,
-    nextFlowMonth,
     flowFilter,
     setFlowFilter,
     members,
@@ -43,10 +48,6 @@ export function FlowTab({
     toast,
     openEditRecord,
   } = ledger
-
-  const today = new Date().toISOString().slice(0, 10)
-  const todayYm = today.slice(0, 7)
-  const isMonthView = flowViewMode === "month"
 
   // 类型筛选: "all" | "out" | "in" | "save"
   const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
@@ -178,79 +179,28 @@ export function FlowTab({
       <header className="topbar">
         <div className="topinfo">
           <div className="sub">
-            {isMonthView ? `${formatFlowMonthLabel(flowDate)} · 全部账单` : `${formatFlowDateLabel(flowDate)} · 当日账单`}
+            {flowDateMode === "day"
+              ? `${formatFlowDateLabel(flowDate)} · 当日账单`
+              : flowDateMode === "range"
+                ? `${flowRangeStart} ~ ${flowRangeEnd}`
+                : `${formatFlowMonthLabel(flowDate)} · 全部账单`}
           </div>
           <div className="names">流水明细</div>
         </div>
       </header>
       <div className="flow-filter-row">
-        <div className="flow-view-toggle">
-          <button
-            className={`filter ${isMonthView ? "on" : ""}`}
-            onClick={() => setFlowViewMode("month")}
-            type="button"
-          >
-            按月
-          </button>
-          <button
-            className={`filter ${!isMonthView ? "on" : ""}`}
-            onClick={() => setFlowViewMode("day")}
-            type="button"
-          >
-            按日
-          </button>
-        </div>
-        <div className="flow-month-switch">
-          {isMonthView ? (
-            <>
-              <button className="ms-btn" onClick={prevFlowMonth} type="button" aria-label="上一月">◀</button>
-              <span className="ms-now">{formatFlowMonthLabel(flowDate)}</span>
-              <button
-                className="ms-btn"
-                onClick={nextFlowMonth}
-                type="button"
-                aria-label="下一月"
-                disabled={flowDate.slice(0, 7) >= todayYm}
-              >
-                ▶
-              </button>
-              <input
-                className="flow-date-input"
-                type="month"
-                value={flowDate.slice(0, 7)}
-                max={todayYm}
-                onChange={(e) => {
-                  if (e.target.value) setFlowDate(`${e.target.value}-01`)
-                }}
-                aria-label="选择月份"
-              />
-            </>
-          ) : (
-            <>
-              <button className="ms-btn" onClick={prevFlowDay} type="button" aria-label="前一天">◀</button>
-              <span className="ms-now">{formatFlowDateLabel(flowDate)}</span>
-              <button
-                className="ms-btn"
-                onClick={nextFlowDay}
-                type="button"
-                aria-label="后一天"
-                disabled={flowDate >= today}
-              >
-                ▶
-              </button>
-              <input
-                className="flow-date-input"
-                type="date"
-                value={flowDate}
-                max={today}
-                onChange={(e) => {
-                  if (e.target.value) setFlowDate(e.target.value)
-                }}
-                aria-label="选择日期"
-              />
-            </>
-          )}
-        </div>
+        <button
+          className="flow-date-dropdown"
+          onClick={() => setFlowDateSheetOpen(true)}
+          type="button"
+        >
+          {flowDateMode === "month"
+            ? `${flowDate.slice(0, 4)}-${flowDate.slice(5, 7)}`
+            : flowDateMode === "range"
+              ? `${flowRangeStart} ~ ${flowRangeEnd}`
+              : `${flowDate.slice(0, 4)}-${flowDate.slice(5, 7)}`}
+          {" "}▾
+        </button>
         <div className="filters">
           {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
             <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)} type="button">{f.label}</button>
@@ -279,7 +229,7 @@ export function FlowTab({
       {displayItems.length > 0 && (
         <div className="bulk-bar">
           <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, cursor: "pointer", userSelect: "none" }}>
-            <input type="checkbox" className="bulk-cb" checked={allSelected} onChange={toggleSelectAll} /> {isMonthView ? "全选本月" : "全选当日"}
+            <input type="checkbox" className="bulk-cb" checked={allSelected} onChange={toggleSelectAll} /> {flowDateMode === "month" ? "全选本月" : flowDateMode === "day" ? "全选当日" : "全选区间"}
           </label>
           {selectedIds.size > 0 && (
             <>
@@ -293,7 +243,7 @@ export function FlowTab({
         <div className="flow-empty">
           <div className="flow-empty-ico">📋</div>
           <div className="flow-empty-txt">
-            {isMonthView ? "这个月还没有账单，点 + 记第一笔吧" : "这一天还没有账单，点 + 记一笔吧"}
+            {flowDateMode === "day" ? "这一天还没有账单，点 + 记一笔吧" : flowDateMode === "range" ? "这个时间段还没有账单" : "这个月还没有账单，点 + 记第一笔吧"}
           </div>
         </div>
       ) : (
@@ -361,6 +311,22 @@ export function FlowTab({
         </div>
       )}
       <div className="flow-end">— 到底啦 —</div>
+
+      <FlowDateSheet
+        open={flowDateSheetOpen}
+        initialYear={Number(flowDate.slice(0, 4))}
+        initialMonth={Number(flowDate.slice(5, 7))}
+        onClose={() => setFlowDateSheetOpen(false)}
+        onMonthSelect={(year, month) => {
+          setFlowDateMode("month")
+          setFlowDate(`${year}-${String(month).padStart(2, "0")}-01`)
+        }}
+        onRangeSelect={(start, end) => {
+          setFlowDateMode("range")
+          setFlowRangeStart(start)
+          setFlowRangeEnd(end)
+        }}
+      />
     </section>
   )
 }

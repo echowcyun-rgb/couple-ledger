@@ -14,13 +14,40 @@ export function PwaRegister() {
       return
     }
 
-    navigator.serviceWorker.register("/sw.js").catch(() => {})
+    let reloaded = false
+    const reloadOnce = () => {
+      if (reloaded) return
+      reloaded = true
+      window.location.reload()
+    }
+
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => {
+        void reg.update()
+        reg.addEventListener("updatefound", () => {
+          const worker = reg.installing
+          if (!worker) return
+          worker.addEventListener("statechange", () => {
+            if (worker.state === "activated" && navigator.serviceWorker.controller) {
+              reloadOnce()
+            }
+          })
+        })
+      })
+      .catch(() => {})
+
+    const onControllerChange = () => reloadOnce()
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange)
 
     const onInstall = (e: Event) => {
       e.preventDefault()
     }
     window.addEventListener("beforeinstallprompt", onInstall)
-    return () => window.removeEventListener("beforeinstallprompt", onInstall)
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange)
+      window.removeEventListener("beforeinstallprompt", onInstall)
+    }
   }, [])
 
   return null

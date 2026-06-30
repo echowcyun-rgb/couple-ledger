@@ -1,4 +1,4 @@
-const CACHE_NAME = "couple-ledger-v26"
+const CACHE_NAME = "couple-ledger-v27"
 
 const LOCAL_ASSETS = [
   "./manifest.json",
@@ -10,7 +10,7 @@ const LOCAL_ASSETS = [
 ]
 
 /** Next.js 动态资源不缓存，避免刷新后 JS 不匹配 */
-function shouldCache(url: URL): boolean {
+function shouldCache(url) {
   if (url.pathname.startsWith("/_next/")) return false
   if (url.pathname.startsWith("/api/")) return false
   return LOCAL_ASSETS.some((p) => url.pathname === p.replace("./", "/") || url.pathname.endsWith(p.slice(1)))

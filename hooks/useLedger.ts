@@ -287,10 +287,11 @@ export function useLedger() {
       const message = e instanceof Error ? e.message : String(e)
       toast(`云同步失败：${message || "请检查网络"}`)
     } finally {
-      if (gen !== syncGenerationRef.current) return
-      allowPushRef.current = true
-      setCloudSynced(true)
-      saveState(loadState(), { push: true })
+      if (gen === syncGenerationRef.current) {
+        allowPushRef.current = true
+        setCloudSynced(true)
+        saveState(loadState(), { push: true })
+      }
     }
   }, [toast])
 

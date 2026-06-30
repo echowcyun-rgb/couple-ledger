@@ -3,7 +3,7 @@ import tseslint from "typescript-eslint"
 
 export default tseslint.config(
   {
-    ignores: [".next/**", "node_modules/**", "coverage/**", "public/js/**"],
+    ignores: [".next/**", "node_modules/**", "coverage/**", "out/**", "public/js/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -14,6 +14,17 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
+    files: ["public/sw.js"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        caches: "readonly",
+        fetch: "readonly",
+        URL: "readonly",
+      },
     },
   }
 )

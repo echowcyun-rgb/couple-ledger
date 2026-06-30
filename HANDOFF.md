@@ -81,12 +81,12 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_y TEXT DEFAULT 'cente
 - Vercel 项目：**couple-ledger**（echowcyun-3364s-projects）
 - 生产 URL：https://couple-ledger.vercel.app
 - 线上最新部署：commit `f948729`（优化 11），状态 READY
-- 本地待推送：`fd9e448` + `cd90c98` + `efddb57`（优化 12–14），推送后 Vercel 自动部署
+- 本地待推送：`fd9e448` + `cd90c98` + `b212692`（优化 12–14），推送后 Vercel 自动部署
 - 部署方式：`git push origin main`（见 `Vercel部署指令.md`）
 
 ## 最近 commit 记录
 ```
-efddb57 feat(ui): 优化14 — 滚轮日期选择、复盘配色与强制跳转 RoomSetup
+fff51b0 feat(ui): 优化14 — 滚轮日期选择、复盘配色与强制跳转 RoomSetup
 cd90c98 docs: 更新 HANDOFF — 优化9-13 进度、Vercel 部署状态与待办
 fd9e448 feat: 优化9-13 全部完成（头像分组/背景图同步/日期重构/移除外部依赖/理财统计）
 f948729 feat(ui): 优化11 — 流水日期下拉弹窗，支持月份与自定义区间筛选

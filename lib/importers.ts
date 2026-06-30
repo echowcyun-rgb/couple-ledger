@@ -1,6 +1,9 @@
-import * as XLSX from "@e965/xlsx"
 import { matchCategoryByKeywords } from "./category-keywords"
+import { loadXlsx } from "./xlsx"
+import type { WorkBook, WorkSheet } from "@e965/xlsx"
 import type { Category, ImportBatch, Member, Transaction, TxType } from "./types"
+
+type XlsxModule = Awaited<ReturnType<typeof loadXlsx>>
 
 // ===== 导入结果类型 =====
 export interface ImportResult {
@@ -344,7 +347,7 @@ function isHeaderLikeRow(row: Record<string, unknown>): boolean {
   )
 }
 
-function findHeaderRowIndex(sheet: XLSX.WorkSheet): number {
+function findHeaderRowIndex(sheet: WorkSheet, XLSX: XlsxModule): number {
   const ref = sheet["!ref"]
   if (!ref) return 0
   const range = XLSX.utils.decode_range(ref)
@@ -367,7 +370,7 @@ function findHeaderRowIndex(sheet: XLSX.WorkSheet): number {
   return range.s.r
 }
 
-function parseImportDate(raw: unknown): string {
+function parseImportDate(raw: unknown, XLSX: XlsxModule): string {
   if (raw == null || raw === "") return ""
   if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
     return raw.toISOString().slice(0, 10)
@@ -419,14 +422,16 @@ function rowsToTransactions(
   rows: Record<string, unknown>[],
   members: Member[],
   cats: Category[],
-  memberId: string
+  memberId: string,
+  XLSX: XlsxModule
 ): Transaction[] {
   return rows
     .map((row, idx) => {
       if (isHeaderLikeRow(row)) return null
 
       const date = parseImportDate(
-        getCell(row, "date", "日期", "时间", "交易时间", "交易日期", "记账日期")
+        getCell(row, "date", "日期", "时间", "交易时间", "交易日期", "记账日期"),
+        XLSX
       )
       const type = parseImportType(
         getCell(row, "type", "类型", "收支类型", "收/支", "收支")
@@ -473,11 +478,11 @@ function rowsToTransactions(
     .filter(Boolean) as Transaction[]
 }
 
-function sheetRowsFromWorkbook(wb: XLSX.WorkBook): Record<string, unknown>[] {
+function sheetRowsFromWorkbook(wb: WorkBook, XLSX: XlsxModule): Record<string, unknown>[] {
   const sheetName = wb.SheetNames.includes("账单") ? "账单" : wb.SheetNames[0]
   const ws = wb.Sheets[sheetName]
   if (!ws) return []
-  const headerRow = findHeaderRowIndex(ws)
+  const headerRow = findHeaderRowIndex(ws, XLSX)
   return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
     raw: true,
     defval: "",
@@ -496,37 +501,41 @@ function buildGenericResult(
   }
 }
 
-export function parseGenericCsv(
+export async function parseGenericCsv(
   content: string,
   members: Member[],
   cats: Category[] = [],
   memberId?: string
-): ImportResult {
+): Promise<ImportResult> {
+  const XLSX = await loadXlsx()
   const recorder = memberId || members[0]?.id || ""
   const text = content.replace(/^\uFEFF/, "")
   const wb = XLSX.read(text, { type: "string", cellDates: true })
   const transactions = rowsToTransactions(
-    sheetRowsFromWorkbook(wb),
+    sheetRowsFromWorkbook(wb, XLSX),
     members,
     cats,
-    recorder
+    recorder,
+    XLSX
   )
   return buildGenericResult(transactions, recorder)
 }
 
-export function parseGenericXlsx(
+export async function parseGenericXlsx(
   buffer: ArrayBuffer,
   members: Member[],
   cats: Category[] = [],
   memberId?: string
-): ImportResult {
+): Promise<ImportResult> {
+  const XLSX = await loadXlsx()
   const recorder = memberId || members[0]?.id || ""
   const wb = XLSX.read(new Uint8Array(buffer), { type: "array", cellDates: true })
   const transactions = rowsToTransactions(
-    sheetRowsFromWorkbook(wb),
+    sheetRowsFromWorkbook(wb, XLSX),
     members,
     cats,
-    recorder
+    recorder,
+    XLSX
   )
   return buildGenericResult(transactions, recorder)
 }

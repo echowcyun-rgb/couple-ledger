@@ -55,6 +55,10 @@ export function MemberPage({
 
   function handleGenderChange(nextGender: Gender) {
     setEditGender(nextGender)
+    if (nextGender === "other") {
+      setEditAvatar("")
+      return
+    }
     const pool =
       nextGender === "female" ? SYS_AVATARS_FEMALE : nextGender === "male" ? SYS_AVATARS_MALE : []
     if (editAvatar && !pool.includes(editAvatar) && !editAvatar.startsWith("data:")) {
@@ -107,7 +111,11 @@ export function MemberPage({
           {editingMember ? (
             <div className="member-edit">
               <div className="me-avatar-wrap">
-                <img className="me-avatar" src={editAvatar || "/placeholder.svg"} alt="头像" />
+                {editGender === "other" && !editAvatar ? (
+                  <div className="me-avatar me-avatar-empty" aria-label="未上传头像" />
+                ) : (
+                  <img className="me-avatar" src={editAvatar || "/placeholder.svg"} alt="头像" />
+                )}
               </div>
               <div className="me-av-section-label">
                 {editGender === "other" ? "上传头像" : "选择系统头像"}

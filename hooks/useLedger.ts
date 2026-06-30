@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import * as XLSX from "@e965/xlsx"
 import { SYS_AVATARS } from "@/lib/constants"
-import { coupleDaysFrom } from "@/lib/format"
+import { coupleDaysFrom, shiftDate, shiftMonth } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud } from "@/lib/storage"
 import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
@@ -34,6 +33,7 @@ import {
   type ImportResult,
 } from "@/lib/importers"
 import { decodeBillCsv } from "@/lib/csv-decode"
+import { loadXlsx } from "@/lib/xlsx"
 import type {
   AppState,
   Gender,
@@ -111,8 +111,8 @@ export function useLedger() {
   const [newCatType, setNewCatType] = useState<TxType>("out")
 
   const [flowFilter, setFlowFilter] = useState<"all" | string>("all")
-  const [flowYear, setFlowYear] = useState(() => new Date().getFullYear())
-  const [flowMonth, setFlowMonth] = useState(() => new Date().getMonth() + 1)
+  const [flowViewMode, setFlowViewMode] = useState<"month" | "day">("month")
+  const [flowDate, setFlowDate] = useState(() => new Date().toISOString().slice(0, 10))
 
   const [recordOpen, setRecordOpen] = useState(false)
   const [recType, setRecType] = useState<TxType>("out")
@@ -264,33 +264,41 @@ export function useLedger() {
     () =>
       groupByDate(
         transactions.filter((t) => {
+          if (flowViewMode === "day") return t.date === flowDate
           const d = new Date(t.date + "T12:00:00")
-          return d.getFullYear() === flowYear && d.getMonth() + 1 === flowMonth
+          const [y, m] = flowDate.split("-").map(Number)
+          return d.getFullYear() === y && d.getMonth() + 1 === m
         }),
         cats,
         members,
         flowFilter === "all" ? undefined : flowFilter
       ),
-    [transactions, cats, members, flowFilter, flowYear, flowMonth]
+    [transactions, cats, members, flowFilter, flowDate, flowViewMode]
   )
 
+  const prevFlowDay = useCallback(() => {
+    setFlowDate((d) => shiftDate(d, -1))
+  }, [])
+
+  const nextFlowDay = useCallback(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    setFlowDate((d) => {
+      const next = shiftDate(d, 1)
+      return next > today ? d : next
+    })
+  }, [])
+
   const prevFlowMonth = useCallback(() => {
-    if (flowMonth === 1) {
-      setFlowMonth(12)
-      setFlowYear((y) => y - 1)
-    } else {
-      setFlowMonth((m) => m - 1)
-    }
-  }, [flowMonth])
+    setFlowDate((d) => shiftMonth(d, -1))
+  }, [])
 
   const nextFlowMonth = useCallback(() => {
-    if (flowMonth === 12) {
-      setFlowMonth(1)
-      setFlowYear((y) => y + 1)
-    } else {
-      setFlowMonth((m) => m + 1)
-    }
-  }, [flowMonth])
+    const todayYm = new Date().toISOString().slice(0, 7)
+    setFlowDate((d) => {
+      const next = shiftMonth(d, 1)
+      return next.slice(0, 7) > todayYm ? d : next
+    })
+  }, [])
 
   const revertableBatches = useMemo(
     () =>
@@ -447,32 +455,37 @@ export function useLedger() {
     }
   }, [toast, state.roomId])
 
-  const exportTransactionsXlsx = useCallback((memberId?: string) => {
-    const targetMemberId = memberId || members[0]?.id || ""
-    const filtered = targetMemberId
-      ? transactions.filter((t) => t.memberId === targetMemberId)
-      : transactions
-    const memberName = members.find((m) => m.id === targetMemberId)?.name || "全部"
-    const rows = filtered.map((t) => ({
-      日期: t.date,
-      类型: t.type === "out" ? "支出" : t.type === "in" ? "收入" : "存钱",
-      金额: t.amount,
-      分类: cats.find((c) => c.key === t.categoryKey)?.label || (t.categoryKey || "未分类"),
-      经手人: members.find((m) => m.id === t.memberId)?.name || t.memberId,
-      备注: t.note || "",
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "账单")
-    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `账单_${memberName}_${new Date().toISOString().slice(0, 10)}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast("已导出账单 xlsx")
+  const exportTransactionsXlsx = useCallback(async (memberId?: string) => {
+    try {
+      const XLSX = await loadXlsx()
+      const targetMemberId = memberId || members[0]?.id || ""
+      const filtered = targetMemberId
+        ? transactions.filter((t) => t.memberId === targetMemberId)
+        : transactions
+      const memberName = members.find((m) => m.id === targetMemberId)?.name || "全部"
+      const rows = filtered.map((t) => ({
+        日期: t.date,
+        类型: t.type === "out" ? "支出" : t.type === "in" ? "收入" : "存钱",
+        金额: t.amount,
+        分类: cats.find((c) => c.key === t.categoryKey)?.label || (t.categoryKey || "未分类"),
+        经手人: members.find((m) => m.id === t.memberId)?.name || t.memberId,
+        备注: t.note || "",
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "账单")
+      const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `账单_${memberName}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast("已导出账单 xlsx")
+    } catch {
+      toast("导出失败，请刷新页面后重试")
+    }
   }, [transactions, cats, members, toast])
 
   const addGoal = useCallback(() => {
@@ -905,24 +918,26 @@ export function useLedger() {
     if (lowerName.endsWith(".csv")) {
       const reader = new FileReader()
       reader.onload = (ev) => {
-        try {
-          const buffer = ev.target!.result as ArrayBuffer
-          const text = decodeBillCsv(buffer)
-          const source = detectSource(text, file.name)
+        void (async () => {
+          try {
+            const buffer = ev.target!.result as ArrayBuffer
+            const text = decodeBillCsv(buffer)
+            const source = detectSource(text, file.name)
 
-          if (source === "alipay" || source === "wechat") {
-            const result =
-              source === "alipay"
-                ? parseAlipayCSV(text, memberId, cats)
-                : parseWechatCSV(text, memberId, cats)
-            openImportPreview(result, memberId, fileFingerprint)
-            return
+            if (source === "alipay" || source === "wechat") {
+              const result =
+                source === "alipay"
+                  ? parseAlipayCSV(text, memberId, cats)
+                  : parseWechatCSV(text, memberId, cats)
+              openImportPreview(result, memberId, fileFingerprint)
+              return
+            }
+
+            openImportPreview(await parseGenericCsv(text, members, cats, memberId), memberId, fileFingerprint)
+          } catch {
+            toast("文件解析失败，请确认是有效的 CSV 文件")
           }
-
-          openImportPreview(parseGenericCsv(text, members, cats, memberId), memberId, fileFingerprint)
-        } catch {
-          toast("文件解析失败，请确认是有效的 CSV 文件")
-        }
+        })()
       }
       reader.readAsArrayBuffer(file)
       e.target.value = ""
@@ -932,15 +947,17 @@ export function useLedger() {
     if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
       const reader = new FileReader()
       reader.onload = (ev) => {
-        try {
-          openImportPreview(
-            parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats, memberId),
-            memberId,
-            fileFingerprint
-          )
-        } catch {
-          toast("文件解析失败，请检查格式")
-        }
+        void (async () => {
+          try {
+            openImportPreview(
+              await parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats, memberId),
+              memberId,
+              fileFingerprint
+            )
+          } catch {
+            toast("文件解析失败，请检查格式")
+          }
+        })()
       }
       reader.readAsArrayBuffer(file)
       e.target.value = ""
@@ -1073,8 +1090,12 @@ export function useLedger() {
     setNewCatType,
     flowFilter,
     setFlowFilter,
-    flowYear,
-    flowMonth,
+    flowViewMode,
+    setFlowViewMode,
+    flowDate,
+    setFlowDate,
+    prevFlowDay,
+    nextFlowDay,
     prevFlowMonth,
     nextFlowMonth,
     filteredFlow,

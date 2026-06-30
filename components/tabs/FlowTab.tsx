@@ -1,4 +1,4 @@
-import { formatFlowDate, yuan } from "@/lib/format"
+import { formatFlowDate, formatFlowDateLabel, formatFlowMonthLabel, yuan } from "@/lib/format"
 import type { Ledger } from "@/hooks/useLedger"
 import { useState, useRef } from "react"
 
@@ -6,8 +6,12 @@ export function FlowTab({
   ledger,
 }: {
   ledger: Pick<Ledger,
-    | "flowYear"
-    | "flowMonth"
+    | "flowViewMode"
+    | "setFlowViewMode"
+    | "flowDate"
+    | "setFlowDate"
+    | "prevFlowDay"
+    | "nextFlowDay"
     | "prevFlowMonth"
     | "nextFlowMonth"
     | "flowFilter"
@@ -21,7 +25,28 @@ export function FlowTab({
     | "openEditRecord"
   >
 }) {
-  const { flowYear, flowMonth, prevFlowMonth, nextFlowMonth, flowFilter, setFlowFilter, members, filteredFlow, cats, deleteTransaction, toast, openEditRecord } = ledger
+  const {
+    flowViewMode,
+    setFlowViewMode,
+    flowDate,
+    setFlowDate,
+    prevFlowDay,
+    nextFlowDay,
+    prevFlowMonth,
+    nextFlowMonth,
+    flowFilter,
+    setFlowFilter,
+    members,
+    filteredFlow,
+    cats,
+    deleteTransaction,
+    toast,
+    openEditRecord,
+  } = ledger
+
+  const today = new Date().toISOString().slice(0, 10)
+  const todayYm = today.slice(0, 7)
+  const isMonthView = flowViewMode === "month"
 
   // 类型筛选: "all" | "out" | "in" | "save"
   const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
@@ -69,22 +94,33 @@ export function FlowTab({
     }
   }
 
+  function toggleSelectDay(itemIds: string[]) {
+    const daySelected = itemIds.length > 0 && itemIds.every((id) => selectedIds.has(id))
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (daySelected) {
+        itemIds.forEach((id) => next.delete(id))
+      } else {
+        itemIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return
-    // 批量一次性删除
+    const count = selectedIds.size
     for (const id of selectedIds) {
       deleteTransaction(id)
     }
     setSelectedIds(new Set())
-    toast(`已删除 ${selectedIds.size} 条`)
+    toast(`已删除 ${count} 条`)
   }
 
   // 左滑触摸事件
   function handleTouchStart(e: React.TouchEvent, id: string) {
-    // 如果正在操作批量选择checkbox区域，不触发滑动
     touchStartX.current = e.touches[0].clientX
     touchCurrentX.current = touchStartX.current
-    // 如果当前有其他项被滑开，先关闭
     if (swipedId && swipedId !== id) {
       setSwipedId(null)
     }
@@ -98,7 +134,6 @@ export function FlowTab({
     applySwipeResult(id)
   }
 
-  // 鼠标左滑（桌面端 fallback，逻辑与 touch 相同）
   function handleMouseDown(e: React.MouseEvent, id: string) {
     touchStartX.current = e.clientX
     touchCurrentX.current = e.clientX
@@ -129,9 +164,7 @@ export function FlowTab({
     setSwipedId(null)
   }
 
-  // 点击项目 → 编辑
   function handleItemClick(id: string) {
-    // 如果左滑已打开，先关闭；否则进入编辑
     if (swipedId === id) {
       setSwipedId(null)
       return
@@ -144,20 +177,83 @@ export function FlowTab({
     <section className="page active">
       <header className="topbar">
         <div className="topinfo">
-          <div className="sub">{flowYear}年 {flowMonth}月 · 全部账单</div>
+          <div className="sub">
+            {isMonthView ? `${formatFlowMonthLabel(flowDate)} · 全部账单` : `${formatFlowDateLabel(flowDate)} · 当日账单`}
+          </div>
           <div className="names">流水明细</div>
         </div>
       </header>
-      {/* 筛选区：类型横排 + 分类下拉 + 经手人横排 */}
       <div className="flow-filter-row">
+        <div className="flow-view-toggle">
+          <button
+            className={`filter ${isMonthView ? "on" : ""}`}
+            onClick={() => setFlowViewMode("month")}
+            type="button"
+          >
+            按月
+          </button>
+          <button
+            className={`filter ${!isMonthView ? "on" : ""}`}
+            onClick={() => setFlowViewMode("day")}
+            type="button"
+          >
+            按日
+          </button>
+        </div>
         <div className="flow-month-switch">
-          <button className="ms-btn" onClick={prevFlowMonth} type="button">◀</button>
-          <span className="ms-now">{flowYear}年 {flowMonth}月</span>
-          <button className="ms-btn" onClick={nextFlowMonth} type="button">▶</button>
+          {isMonthView ? (
+            <>
+              <button className="ms-btn" onClick={prevFlowMonth} type="button" aria-label="上一月">◀</button>
+              <span className="ms-now">{formatFlowMonthLabel(flowDate)}</span>
+              <button
+                className="ms-btn"
+                onClick={nextFlowMonth}
+                type="button"
+                aria-label="下一月"
+                disabled={flowDate.slice(0, 7) >= todayYm}
+              >
+                ▶
+              </button>
+              <input
+                className="flow-date-input"
+                type="month"
+                value={flowDate.slice(0, 7)}
+                max={todayYm}
+                onChange={(e) => {
+                  if (e.target.value) setFlowDate(`${e.target.value}-01`)
+                }}
+                aria-label="选择月份"
+              />
+            </>
+          ) : (
+            <>
+              <button className="ms-btn" onClick={prevFlowDay} type="button" aria-label="前一天">◀</button>
+              <span className="ms-now">{formatFlowDateLabel(flowDate)}</span>
+              <button
+                className="ms-btn"
+                onClick={nextFlowDay}
+                type="button"
+                aria-label="后一天"
+                disabled={flowDate >= today}
+              >
+                ▶
+              </button>
+              <input
+                className="flow-date-input"
+                type="date"
+                value={flowDate}
+                max={today}
+                onChange={(e) => {
+                  if (e.target.value) setFlowDate(e.target.value)
+                }}
+                aria-label="选择日期"
+              />
+            </>
+          )}
         </div>
         <div className="filters">
           {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
-            <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)}>{f.label}</button>
+            <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)} type="button">{f.label}</button>
           ))}
         </div>
         <div className="rec-field flow-cat-select">
@@ -174,22 +270,21 @@ export function FlowTab({
           </select>
         </div>
         <div className="filters">
-          <button className={`filter ${flowFilter === "all" ? "on" : ""}`} onClick={() => setFlowFilter("all")}>全部经手人</button>
+          <button className={`filter ${flowFilter === "all" ? "on" : ""}`} onClick={() => setFlowFilter("all")} type="button">全部经手人</button>
           {members.map((m) => (
-            <button key={m.id} className={`filter ${flowFilter === m.id ? "on" : ""}`} onClick={() => setFlowFilter(m.id)}>{m.name}</button>
+            <button key={m.id} className={`filter ${flowFilter === m.id ? "on" : ""}`} onClick={() => setFlowFilter(m.id)} type="button">{m.name}</button>
           ))}
         </div>
       </div>
-      {/* 批量操作栏 */}
       {displayItems.length > 0 && (
         <div className="bulk-bar">
           <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, cursor: "pointer", userSelect: "none" }}>
-            <input type="checkbox" className="bulk-cb" checked={allSelected} onChange={toggleSelectAll} /> 全选
+            <input type="checkbox" className="bulk-cb" checked={allSelected} onChange={toggleSelectAll} /> {isMonthView ? "全选本月" : "全选当日"}
           </label>
           {selectedIds.size > 0 && (
             <>
-              <button className="flow-act-btn flow-bulk-delete" onClick={handleBulkDelete}>删除选中（{selectedIds.size}条）</button>
-              <button className="flow-act-btn flow-bulk-clear" onClick={() => setSelectedIds(new Set())}>取消选择</button>
+              <button className="flow-act-btn flow-bulk-delete" onClick={handleBulkDelete} type="button">删除选中（{selectedIds.size}条）</button>
+              <button className="flow-act-btn flow-bulk-clear" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button>
             </>
           )}
         </div>
@@ -197,58 +292,72 @@ export function FlowTab({
       {displayItems.length === 0 ? (
         <div className="flow-empty">
           <div className="flow-empty-ico">📋</div>
-          <div className="flow-empty-txt">还没有账单记录，点 + 记第一笔吧</div>
+          <div className="flow-empty-txt">
+            {isMonthView ? "这个月还没有账单，点 + 记第一笔吧" : "这一天还没有账单，点 + 记一笔吧"}
+          </div>
         </div>
       ) : (
         <div className="flow-groups">
-          {displayItems.map((group) => (
-            <div className="flow-day" key={group.date}>
-              <div className="flow-day-head">
-                <span>{formatFlowDate(group.date)}</span>
-                <span className={`flow-day-sum ${group.sum >= 0 ? "pos" : "neg"}`}>
-                  {group.sum >= 0 ? "+" : ""}{yuan(Math.abs(group.sum))}
-                </span>
-              </div>
-              {group.items.map((item) => (
-                <div
-                  className="flow-item-swipe-wrap"
-                  key={item.id}
-                  onTouchStart={(e) => handleTouchStart(e, item.id)}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={() => handleTouchEnd(item.id)}
-                  onMouseDown={(e) => handleMouseDown(e, item.id)}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={() => handleMouseUp(item.id)}
-                >
-                  <div
-                    className={`flow-item ${swipedId === item.id ? "swiped" : ""}`}
-                    onClick={() => handleItemClick(item.id)}
-                  >
-                    <label style={{ marginRight: 4, flexShrink: 0, display: "flex", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" className="bulk-cb" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
-                    </label>
-                    <span className="flow-cat-glyph">{item.catGlyph}</span>
-                    <div className="flow-item-main">
-                      <div className="flow-item-cat">{item.catLabel}{item.note ? ` · ${item.note}` : ""}</div>
-                      <div className="flow-item-sub">{item.memberName}</div>
-                    </div>
-                    <span className={`flow-item-amt ${item.type}`}>
-                      {item.type === "out" ? "-" : "+"}{yuan(item.amount)}
-                    </span>
-                  </div>
-                  {/* 左滑删除按钮 */}
-                  {swipedId === item.id && (
-                    <button
-                      className="flow-swipe-del"
-                      onClick={(e) => { e.stopPropagation(); handleSwipeDelete(item.id); }}
-                    >
-                      删除
-                    </button>
-                  )}
+          {displayItems.map((group) => {
+            const dayIds = group.items.map((i) => i.id)
+            const daySelected = dayIds.length > 0 && dayIds.every((id) => selectedIds.has(id))
+            return (
+              <div className="flow-day" key={group.date}>
+                <div className="flow-day-head">
+                  <label className="flow-day-select">
+                    <input
+                      type="checkbox"
+                      className="bulk-cb"
+                      checked={daySelected}
+                      onChange={() => toggleSelectDay(dayIds)}
+                    />
+                    <span>{formatFlowDate(group.date)}</span>
+                  </label>
+                  <span className={`flow-day-sum ${group.sum >= 0 ? "pos" : "neg"}`}>
+                    {group.sum >= 0 ? "+" : ""}{yuan(Math.abs(group.sum))}
+                  </span>
                 </div>
-              ))}
-            </div>
-          ))}
+                {group.items.map((item) => (
+                  <div
+                    className="flow-item-swipe-wrap"
+                    key={item.id}
+                    onTouchStart={(e) => handleTouchStart(e, item.id)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(item.id)}
+                    onMouseDown={(e) => handleMouseDown(e, item.id)}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={() => handleMouseUp(item.id)}
+                  >
+                    <div
+                      className={`flow-item ${swipedId === item.id ? "swiped" : ""}`}
+                      onClick={() => handleItemClick(item.id)}
+                    >
+                      <label style={{ marginRight: 4, flexShrink: 0, display: "flex", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" className="bulk-cb" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
+                      </label>
+                      <span className="flow-cat-glyph">{item.catGlyph}</span>
+                      <div className="flow-item-main">
+                        <div className="flow-item-cat">{item.catLabel}{item.note ? ` · ${item.note}` : ""}</div>
+                        <div className="flow-item-sub">{item.memberName}</div>
+                      </div>
+                      <span className={`flow-item-amt ${item.type}`}>
+                        {item.type === "out" ? "-" : "+"}{yuan(item.amount)}
+                      </span>
+                    </div>
+                    {swipedId === item.id && (
+                      <button
+                        className="flow-swipe-del"
+                        onClick={(e) => { e.stopPropagation(); handleSwipeDelete(item.id); }}
+                        type="button"
+                      >
+                        删除
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
         </div>
       )}
       <div className="flow-end">— 到底啦 —</div>

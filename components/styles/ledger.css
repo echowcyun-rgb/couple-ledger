@@ -134,10 +134,14 @@
 .app .filters { display: flex; gap: 8px; margin-bottom: 16px; }
 .app .flow-filter-row .filters { margin-bottom: 12px; }
 .app .flow-filter-row .flow-cat-select { margin-bottom: 16px; }
-.app .flow-month-switch { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
-.app .flow-month-switch .ms-now { font-family: var(--font-pixel-cjk), monospace; font-size: 13px; font-weight: 700; color: var(--ink); }
+.app .flow-month-switch { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.app .flow-month-switch .ms-now { font-family: var(--font-pixel-cjk), monospace; font-size: 13px; font-weight: 700; color: var(--ink); min-width: 7em; text-align: center; }
 .app .flow-month-switch .ms-btn { width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 8px; background: var(--card); color: var(--ink); font-family: var(--font-pixel), monospace; font-size: 10px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); transition: transform .08s steps(2); }
 .app .flow-month-switch .ms-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+.app .flow-month-switch .ms-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.app .flow-date-input { border: 2px solid var(--ink); border-radius: 8px; background: var(--card); color: var(--ink); font-family: var(--font-pixel-cjk), monospace; font-size: 11px; padding: 4px 8px; box-shadow: 2px 2px 0 var(--ink); }
+.app .flow-day-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--cream); border-bottom: 2px dashed rgba(43,36,51,.18); font-size: 11px; }
+.app .flow-day-select { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-family: var(--font-pixel-cjk), monospace; font-weight: 700; color: var(--ink); }
 .app .flow-cat-select .rec-select { width: 100%; }
 .app .filter { flex: 1; border: 3px solid var(--ink); border-radius: 10px; background: var(--card); color: var(--text-sub); font-family: var(--font-pixel-cjk), monospace; font-size: 11px; padding: 8px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); transition: all .1s steps(2); }
 .app .filter.on { background: var(--accent); color: var(--cream); }
@@ -148,7 +152,6 @@
 .app .flow-end { text-align: center; font-size: 9px; color: var(--text-sub); padding: 6px 0 18px; }
 .app .flow-groups { display: flex; flex-direction: column; gap: 14px; margin-bottom: 8px; }
 .app .flow-day { background: var(--card); border: 3px solid var(--ink); border-radius: 14px; overflow: hidden; box-shadow: 4px 4px 0 var(--ink); }
-.app .flow-day-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--cream); border-bottom: 2px dashed rgba(43,36,51,.18); font-size: 11px; }
 .app .flow-day-sum { font-family: var(--font-pixel), monospace; font-size: 11px; }
 .app .flow-day-sum.pos { color: var(--in); }
 .app .flow-day-sum.neg { color: var(--out); }
@@ -336,6 +339,9 @@
 .app .member-edit { background: var(--card); border: 3px solid var(--ink); border-radius: 16px; padding: 16px; box-shadow: 4px 4px 0 var(--ink); }
 .app .me-avatar-wrap { text-align: center; margin-bottom: 8px; }
 .app .me-avatar { width: 88px; height: 88px; border: 4px solid var(--ink); border-radius: 24px; display: block; margin: 0 auto; image-rendering: pixelated; background: var(--cream); }
+.app .me-avatar.me-avatar-empty { border-style: dashed; opacity: 0.55; }
+.app .flow-view-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+.app .flow-view-toggle .filter { flex: 1; }
 .app .me-av-section-label { font-family: var(--font-pixel-cjk), monospace; font-size: 11px; color: var(--text-sub); margin-bottom: 8px; }
 .app .me-av-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 18px; }
 .app .me-av-opt { width: 100%; aspect-ratio: 1; border: 3px solid var(--ink); border-radius: 18px; overflow: hidden; cursor: pointer; background: var(--cream); padding: 0; transition: transform .1s; box-shadow: 2px 2px 0 var(--ink); }
@@ -783,7 +789,7 @@
 .app .room-setup-subtitle {
   font-family: var(--font-pixel-cjk), monospace;
   font-size: 12px;
-  color: #FFFFFF;
+  color: var(--ink);
   margin: 0;
 }
 .app .room-setup-couple {

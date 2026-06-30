@@ -65,12 +65,27 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
         <div className="stat-table">
           <div className="st-row"><span className="st-l">TOP3支出分类</span><span className="st-v">{habitAnalysis.topCategories.length ? habitAnalysis.topCategories.map((t) => `${t.name} ${yuan(t.amount)}(${t.pct}%)`).join(" · ") : "—"}</span></div>
           <div className="st-row"><span className="st-l">环比变化</span><span className="st-v">{habitAnalysis.momChange}</span></div>
-          <div className="st-row"><span className="st-l">大额消费提醒</span><span className="st-v">{habitAnalysis.bigSpends.length ? `${habitAnalysis.bigSpends.length} 笔超过日均×3` : "暂无"}</span></div>
         </div>
         {habitAnalysis.bigSpends.length > 0 && (
-          <div className="tip-card" style={{ marginTop: 12 }}>
-            <span className="tip-ico">!</span>
-            <span>{habitAnalysis.bigSpends[0].date} {habitAnalysis.bigSpends[0].note} {yuan(habitAnalysis.bigSpends[0].amount)}，{habitAnalysis.bigSpends[0].flag}</span>
+          <div className="big-spend-alert">
+            <div className="big-spend-alert-title">
+              <span className="tip-ico warn-ico">!</span>
+              <span>大额消费提醒 · {habitAnalysis.bigSpends.length} 笔超过日均×3</span>
+            </div>
+            <div className="big-spend-list">
+              {habitAnalysis.bigSpends.map((s, i) => (
+                <div key={i} className="big-spend-row">
+                  <span>{s.date}</span>
+                  <span>{s.note}</span>
+                  <span className="big-spend-amt">{yuan(s.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {habitAnalysis.bigSpends.length === 0 && (
+          <div className="stat-table">
+            <div className="st-row"><span className="st-l">大额消费提醒</span><span className="st-v">暂无</span></div>
           </div>
         )}
       </div>

@@ -111,6 +111,8 @@ export function useLedger() {
   const [newCatType, setNewCatType] = useState<TxType>("out")
 
   const [flowFilter, setFlowFilter] = useState<"all" | string>("all")
+  const [flowYear, setFlowYear] = useState(() => new Date().getFullYear())
+  const [flowMonth, setFlowMonth] = useState(() => new Date().getMonth() + 1)
 
   const [recordOpen, setRecordOpen] = useState(false)
   const [recType, setRecType] = useState<TxType>("out")
@@ -259,9 +261,36 @@ export function useLedger() {
   )
 
   const filteredFlow = useMemo(
-    () => groupByDate(transactions, cats, members, flowFilter === "all" ? undefined : flowFilter),
-    [transactions, cats, members, flowFilter]
+    () =>
+      groupByDate(
+        transactions.filter((t) => {
+          const d = new Date(t.date + "T12:00:00")
+          return d.getFullYear() === flowYear && d.getMonth() + 1 === flowMonth
+        }),
+        cats,
+        members,
+        flowFilter === "all" ? undefined : flowFilter
+      ),
+    [transactions, cats, members, flowFilter, flowYear, flowMonth]
   )
+
+  const prevFlowMonth = useCallback(() => {
+    if (flowMonth === 1) {
+      setFlowMonth(12)
+      setFlowYear((y) => y - 1)
+    } else {
+      setFlowMonth((m) => m - 1)
+    }
+  }, [flowMonth])
+
+  const nextFlowMonth = useCallback(() => {
+    if (flowMonth === 12) {
+      setFlowMonth(1)
+      setFlowYear((y) => y + 1)
+    } else {
+      setFlowMonth((m) => m + 1)
+    }
+  }, [flowMonth])
 
   const revertableBatches = useMemo(
     () =>
@@ -1044,6 +1073,10 @@ export function useLedger() {
     setNewCatType,
     flowFilter,
     setFlowFilter,
+    flowYear,
+    flowMonth,
+    prevFlowMonth,
+    nextFlowMonth,
     filteredFlow,
     recordOpen,
     setRecordOpen,

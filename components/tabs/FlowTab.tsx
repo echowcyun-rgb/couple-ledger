@@ -6,7 +6,10 @@ export function FlowTab({
   ledger,
 }: {
   ledger: Pick<Ledger,
-    | "currentMonth"
+    | "flowYear"
+    | "flowMonth"
+    | "prevFlowMonth"
+    | "nextFlowMonth"
     | "flowFilter"
     | "setFlowFilter"
     | "members"
@@ -18,7 +21,7 @@ export function FlowTab({
     | "openEditRecord"
   >
 }) {
-  const { currentMonth, flowFilter, setFlowFilter, members, filteredFlow, cats, deleteTransaction, toast, openEditRecord } = ledger
+  const { flowYear, flowMonth, prevFlowMonth, nextFlowMonth, flowFilter, setFlowFilter, members, filteredFlow, cats, deleteTransaction, toast, openEditRecord } = ledger
 
   // 类型筛选: "all" | "out" | "in" | "save"
   const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
@@ -141,12 +144,17 @@ export function FlowTab({
     <section className="page active">
       <header className="topbar">
         <div className="topinfo">
-          <div className="sub">{currentMonth}月 · 全部账单</div>
+          <div className="sub">{flowYear}年 {flowMonth}月 · 全部账单</div>
           <div className="names">流水明细</div>
         </div>
       </header>
       {/* 筛选区：类型横排 + 分类下拉 + 经手人横排 */}
       <div className="flow-filter-row">
+        <div className="flow-month-switch">
+          <button className="ms-btn" onClick={prevFlowMonth} type="button">◀</button>
+          <span className="ms-now">{flowYear}年 {flowMonth}月</span>
+          <button className="ms-btn" onClick={nextFlowMonth} type="button">▶</button>
+        </div>
         <div className="filters">
           {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
             <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)}>{f.label}</button>

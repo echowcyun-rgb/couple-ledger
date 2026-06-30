@@ -134,6 +134,10 @@
 .app .filters { display: flex; gap: 8px; margin-bottom: 16px; }
 .app .flow-filter-row .filters { margin-bottom: 12px; }
 .app .flow-filter-row .flow-cat-select { margin-bottom: 16px; }
+.app .flow-month-switch { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
+.app .flow-month-switch .ms-now { font-family: var(--font-pixel-cjk), monospace; font-size: 13px; font-weight: 700; color: var(--ink); }
+.app .flow-month-switch .ms-btn { width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 8px; background: var(--card); color: var(--ink); font-family: var(--font-pixel), monospace; font-size: 10px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); transition: transform .08s steps(2); }
+.app .flow-month-switch .ms-btn:active { transform: translate(2px, 2px); box-shadow: none; }
 .app .flow-cat-select .rec-select { width: 100%; }
 .app .filter { flex: 1; border: 3px solid var(--ink); border-radius: 10px; background: var(--card); color: var(--text-sub); font-family: var(--font-pixel-cjk), monospace; font-size: 11px; padding: 8px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); transition: all .1s steps(2); }
 .app .filter.on { background: var(--accent); color: var(--cream); }
@@ -210,6 +214,12 @@
 .app .st-v.warn { color: var(--out); }
 .app .tip-card { display: flex; align-items: flex-start; gap: 10px; background: var(--card); border: 3px solid var(--ink); border-radius: 14px; padding: 12px 14px; margin-bottom: 22px; box-shadow: 4px 4px 0 var(--ink); font-size: 10px; line-height: 1.7; }
 .app .tip-ico { flex: 0 0 auto; width: 22px; height: 22px; border: 2px solid var(--ink); border-radius: 7px; background: var(--save); color: var(--cream); display: flex; align-items: center; justify-content: center; font-family: var(--font-pixel), monospace; font-size: 11px; }
+.app .big-spend-alert { background: #FFD600; border: 3px solid var(--ink); border-radius: 14px; padding: 14px; margin-top: 12px; box-shadow: 4px 4px 0 var(--ink); }
+.app .big-spend-alert-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 13px; font-weight: 700; color: #FFFFFF; text-shadow: 1px 1px 0 var(--ink); margin-bottom: 10px; }
+.app .warn-ico { background: #D32F2F !important; }
+.app .big-spend-list { display: flex; flex-direction: column; gap: 6px; }
+.app .big-spend-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 11px; font-weight: 700; color: #FFFFFF; text-shadow: 1px 1px 0 rgba(0,0,0,.4); }
+.app .big-spend-amt { font-family: var(--font-pixel), monospace; color: #FFFFFF; }
 
 /* 我的 */
 .app .couple-card { position: relative; border: 4px solid var(--ink); border-radius: 16px; background: var(--accent); overflow: hidden; margin-bottom: 24px; box-shadow: 6px 6px 0 var(--ink); min-height: 130px; cursor: pointer; }
@@ -773,7 +783,7 @@
 .app .room-setup-subtitle {
   font-family: var(--font-pixel-cjk), monospace;
   font-size: 12px;
-  color: var(--text-sub);
+  color: #FFFFFF;
   margin: 0;
 }
 .app .room-setup-couple {
@@ -861,12 +871,13 @@
 .app .room-setup-btn-text small {
   font-family: var(--font-pixel-cjk), monospace;
   font-size: 10px;
-  color: var(--text-sub);
+  color: #FFFFFF;
 }
 .app .room-setup-footer {
   font-family: var(--font-pixel), monospace;
   font-size: 8px;
-  color: var(--text-sub);
+  color: #FFFFFF;
+  opacity: 0.7;
   letter-spacing: 0.12em;
   margin: 0;
 }

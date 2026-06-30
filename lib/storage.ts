@@ -289,6 +289,16 @@ async function pushToCloud(state: AppState): Promise<void> {
   } catch (e) {
     console.warn("推送导入批次到云端失败:", e)
   }
+
+  if (state.coupleBg && state.coupleBg.url) {
+    await runSupabaseVoid(() =>
+      supabase!.from("couples").update({
+        couple_bg_url: state.coupleBg.url,
+        couple_bg_pos_x: state.coupleBg.posX,
+        couple_bg_pos_y: state.coupleBg.posY,
+      }).eq("room_id", roomId)
+    )
+  }
 }
 
 /** 从 Supabase 拉取云端数据，与本地合并 */
@@ -397,6 +407,20 @@ export async function syncFromCloud(): Promise<number> {
         local.importBatches = Array.from(batchMap.values()).sort((a, b) =>
           b.time.localeCompare(a.time)
         )
+      }
+
+      const coupleData = await runSupabaseQuery(() =>
+        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y").eq("room_id", roomId).single()
+      )
+      if (coupleData) {
+        const row = coupleData as { couple_bg_url?: string; couple_bg_pos_x?: string; couple_bg_pos_y?: string }
+        if (row.couple_bg_url) {
+          local.coupleBg = normalizeCoupleBg({
+            url: row.couple_bg_url,
+            posX: row.couple_bg_pos_x || "50%",
+            posY: row.couple_bg_pos_y || "center",
+          })
+        }
       }
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(local))

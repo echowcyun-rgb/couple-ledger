@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createRoom, validateRoom, isCloudReady } from "@/lib/supabase"
 
 interface Props {
@@ -20,6 +20,12 @@ export default function RoomSetup({ onDone }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [createdRoom, setCreatedRoom] = useState("")
+  const [existingRoom, setExistingRoom] = useState("")
+
+  useEffect(() => {
+    const saved = localStorage.getItem("couple-room-id")
+    if (saved) setExistingRoom(saved)
+  }, [])
 
   const handleCreate = async () => {
     setLoading(true)
@@ -105,6 +111,17 @@ export default function RoomSetup({ onDone }: Props) {
               <span className="room-setup-av-label">Ta</span>
             </div>
           </div>
+
+          {existingRoom && (
+            <button
+              type="button"
+              className="room-setup-existing"
+              onClick={() => onDone(existingRoom)}
+            >
+              <div className="room-setup-existing-title">进入账本 #{existingRoom}</div>
+              <div className="room-setup-existing-hint">点击继续使用上次账本</div>
+            </button>
+          )}
 
           <div className="room-setup-actions">
             <button className="room-setup-btn green" onClick={handleCreate} disabled={loading} type="button">

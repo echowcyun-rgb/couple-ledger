@@ -156,9 +156,17 @@
 .app .flow-date-month-picker { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; align-items: flex-start; }
 .app .flow-date-scroll-col { flex: 1; min-width: calc(50% - 6px); display: flex; flex-direction: column; gap: 6px; }
 .app .flow-date-scroll-label { font-family: var(--font-pixel-cjk), monospace; font-size: 11px; color: var(--text-sub); text-align: center; }
-.app .flow-date-scroll-list { height: 180px; overflow-y: auto; border: 3px solid var(--ink); border-radius: 10px; background: var(--card); padding: 6px; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
-.app .flow-date-scroll-item { border: 2px solid transparent; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-pixel-cjk), monospace; font-size: 12px; padding: 8px; cursor: pointer; text-align: center; transition: all .08s; }
-.app .flow-date-scroll-item.on { background: var(--accent); color: var(--cream); border-color: var(--ink); font-weight: 700; }
+/* 滚轮选择器 */
+.app .wheel-picker { position: relative; width: 100%; border: 3px solid var(--ink); border-radius: 10px; background: var(--card); }
+.app .wheel-highlight { position: absolute; left: 4px; right: 4px; background: rgba(169, 155, 214, 0.18); border: 2px solid #A99BD6; border-radius: 10px; pointer-events: none; z-index: 1; }
+.app .wheel-list { overflow-y: auto; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.app .wheel-list::-webkit-scrollbar { display: none; }
+.app .wheel-item { text-align: center; font-family: var(--font-pixel-cjk), monospace; font-size: 16px; color: var(--ink); cursor: pointer; transition: color .15s, opacity .15s; opacity: 0.35; }
+.app .wheel-item.on { color: #6B4FB8; opacity: 1; font-weight: 700; }
+.app .wheel-arrow { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; width: 28px; height: 18px; border: 2px solid var(--ink); border-radius: 6px; background: var(--card); color: var(--ink); font-size: 8px; cursor: pointer; box-shadow: 1px 1px 0 var(--ink); display: flex; align-items: center; justify-content: center; }
+.app .wheel-arrow-up { top: 0; }
+.app .wheel-arrow-down { bottom: 0; }
+.app .wheel-arrow:active { transform: translateX(-50%) translate(1px, 1px); box-shadow: none; }
 /* 确认按钮 */
 .app .flow-date-confirm { width: 100%; flex-basis: 100%; margin-top: 0; }
 /* 自定义时间范围 */
@@ -244,12 +252,12 @@
 .app .st-v.warn { color: var(--out); }
 .app .tip-card { display: flex; align-items: flex-start; gap: 10px; background: var(--card); border: 3px solid var(--ink); border-radius: 14px; padding: 12px 14px; margin-bottom: 22px; box-shadow: 4px 4px 0 var(--ink); font-size: 10px; line-height: 1.7; }
 .app .tip-ico { flex: 0 0 auto; width: 22px; height: 22px; border: 2px solid var(--ink); border-radius: 7px; background: var(--save); color: var(--cream); display: flex; align-items: center; justify-content: center; font-family: var(--font-pixel), monospace; font-size: 11px; }
-.app .big-spend-alert { background: #FFD600; border: 3px solid var(--ink); border-radius: 14px; padding: 14px; margin-top: 12px; box-shadow: 4px 4px 0 var(--ink); }
-.app .big-spend-alert-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 13px; font-weight: 700; color: #FFFFFF; text-shadow: 1px 1px 0 var(--ink); margin-bottom: 10px; }
+.app .big-spend-alert { background: #E8C547; border: 3px solid var(--ink); border-radius: 14px; padding: 14px; margin-top: 12px; box-shadow: 4px 4px 0 var(--ink); }
+.app .big-spend-alert-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 13px; font-weight: 700; color: #5D2A1A; text-shadow: 1px 1px 0 rgba(255,255,255,.3); margin-bottom: 10px; }
 .app .warn-ico { background: #D32F2F !important; }
 .app .big-spend-list { display: flex; flex-direction: column; gap: 6px; }
-.app .big-spend-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 11px; font-weight: 700; color: #FFFFFF; text-shadow: 1px 1px 0 rgba(0,0,0,.4); }
-.app .big-spend-amt { font-family: var(--font-pixel), monospace; color: #FFFFFF; }
+.app .big-spend-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel-cjk), monospace; font-size: 11px; font-weight: 700; color: #5D2A1A; text-shadow: 1px 1px 0 rgba(255,255,255,.25); }
+.app .big-spend-amt { font-family: var(--font-pixel), monospace; color: #5D2A1A; }
 
 /* 我的 */
 .app .couple-card { position: relative; border: 4px solid var(--ink); border-radius: 16px; background: var(--accent); overflow: hidden; margin-bottom: 24px; box-shadow: 6px 6px 0 var(--ink); min-height: 130px; cursor: pointer; }
@@ -852,6 +860,10 @@
   margin-bottom: 36px;
   image-rendering: pixelated;
 }
+.app .room-setup-existing { display: block; width: 100%; max-width: 320px; padding: 16px; margin-bottom: 16px; background: var(--card); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 4px 4px 0 var(--ink); cursor: pointer; transition: transform .08s steps(2); text-align: left; }
+.app .room-setup-existing:active { transform: translate(2px, 2px); box-shadow: none; }
+.app .room-setup-existing-title { font-family: var(--font-pixel-cjk), monospace; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.app .room-setup-existing-hint { font-family: var(--font-pixel-cjk), monospace; font-size: 10px; color: var(--text-sub); }
 .app .room-setup-actions {
   width: 100%;
   max-width: 320px;

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 
 interface Props {
   open: boolean
@@ -9,6 +9,96 @@ interface Props {
   onClose: () => void
   onMonthSelect: (year: number, month: number) => void
   onRangeSelect: (startDate: string, endDate: string) => void
+}
+
+const ITEM_HEIGHT = 40
+const VISIBLE_COUNT = 5
+
+function WheelPicker({
+  values,
+  value,
+  onChange,
+  itemHeight = ITEM_HEIGHT,
+  visibleCount = VISIBLE_COUNT,
+}: {
+  values: number[]
+  value: number
+  onChange: (v: number) => void
+  itemHeight?: number
+  visibleCount?: number
+}) {
+  const listRef = useRef<HTMLDivElement>(null)
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerHeight = itemHeight * visibleCount
+  const centerOffset = (containerHeight - itemHeight) / 2
+
+  const scrollToValue = useCallback((v: number, smooth = true) => {
+    const list = listRef.current
+    if (!list) return
+    const idx = values.indexOf(v)
+    if (idx < 0) return
+    const top = idx * itemHeight
+    list.scrollTo({ top, behavior: smooth ? "smooth" : "auto" })
+  }, [values, itemHeight])
+
+  useEffect(() => {
+    scrollToValue(value, false)
+  }, [scrollToValue, value])
+
+  const handleScroll = useCallback(() => {
+    const list = listRef.current
+    if (!list) return
+    if (scrollTimer.current) clearTimeout(scrollTimer.current)
+    scrollTimer.current = setTimeout(() => {
+      const scrollTop = list.scrollTop
+      const idx = Math.round(scrollTop / itemHeight)
+      const clamped = Math.max(0, Math.min(values.length - 1, idx))
+      const newValue = values[clamped]
+      if (newValue !== value) {
+        onChange(newValue)
+      }
+      list.scrollTo({ top: clamped * itemHeight, behavior: "smooth" })
+    }, 120)
+  }, [values, value, onChange, itemHeight])
+
+  const step = (delta: number) => {
+    const idx = values.indexOf(value)
+    const next = Math.max(0, Math.min(values.length - 1, idx + delta))
+    onChange(values[next])
+    scrollToValue(values[next], true)
+  }
+
+  return (
+    <div className="wheel-picker" style={{ height: containerHeight }}>
+      <button className="wheel-arrow wheel-arrow-up" type="button" onClick={() => step(-1)} aria-label="上一个">▲</button>
+      <div className="wheel-highlight" style={{ top: centerOffset, height: itemHeight }} />
+      <div
+        className="wheel-list"
+        ref={listRef}
+        onScroll={handleScroll}
+        style={{
+          height: containerHeight,
+          paddingTop: centerOffset,
+          paddingBottom: centerOffset,
+        }}
+      >
+        {values.map(v => (
+          <div
+            key={v}
+            className={`wheel-item ${v === value ? "on" : ""}`}
+            style={{ height: itemHeight, lineHeight: `${itemHeight}px` }}
+            onClick={() => {
+              onChange(v)
+              scrollToValue(v, true)
+            }}
+          >
+            {v}
+          </div>
+        ))}
+      </div>
+      <button className="wheel-arrow wheel-arrow-down" type="button" onClick={() => step(1)} aria-label="下一个">▼</button>
+    </div>
+  )
 }
 
 export function FlowDateSheet({
@@ -25,28 +115,17 @@ export function FlowDateSheet({
   const [rangeStart, setRangeStart] = useState("")
   const [rangeEnd, setRangeEnd] = useState("")
 
-  const yearRef = useRef<HTMLDivElement>(null)
-  const monthRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     if (open) {
       setSelYear(initialYear)
       setSelMonth(initialMonth)
+      setTab("month")
     }
   }, [open, initialYear, initialMonth])
 
-  useEffect(() => {
-    if (open && tab === "month") {
-      setTimeout(() => {
-        yearRef.current?.querySelector(`[data-val="${selYear}"]`)?.scrollIntoView({ block: "center" })
-        monthRef.current?.querySelector(`[data-val="${selMonth}"]`)?.scrollIntoView({ block: "center" })
-      }, 50)
-    }
-  }, [open, tab, selYear, selMonth])
-
   if (!open) return null
 
-  const years = Array.from({ length: 10 }, (_, i) => initialYear - 5 + i)
+  const years = Array.from({ length: 12 }, (_, i) => initialYear - 6 + i)
   const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
   return (
@@ -66,23 +145,11 @@ export function FlowDateSheet({
           <div className="flow-date-month-picker">
             <div className="flow-date-scroll-col">
               <div className="flow-date-scroll-label">年份</div>
-              <div className="flow-date-scroll-list" ref={yearRef}>
-                {years.map(y => (
-                  <button key={y} data-val={y} className={`flow-date-scroll-item ${y === selYear ? "on" : ""}`} onClick={() => setSelYear(y)} type="button">
-                    {y}年
-                  </button>
-                ))}
-              </div>
+              <WheelPicker values={years} value={selYear} onChange={setSelYear} />
             </div>
             <div className="flow-date-scroll-col">
               <div className="flow-date-scroll-label">月份</div>
-              <div className="flow-date-scroll-list" ref={monthRef}>
-                {months.map(m => (
-                  <button key={m} data-val={m} className={`flow-date-scroll-item ${m === selMonth ? "on" : ""}`} onClick={() => setSelMonth(m)} type="button">
-                    {m}月
-                  </button>
-                ))}
-              </div>
+              <WheelPicker values={months} value={selMonth} onChange={setSelMonth} />
             </div>
             <button className="px-btn flow-date-confirm" onClick={() => { onMonthSelect(selYear, selMonth); onClose() }} type="button">
               查看 {selYear}年{selMonth}月

@@ -37,10 +37,7 @@ export default function Page() {
 
   useEffect(() => {
     if (ledger.hydrated) {
-      const savedRoom = localStorage.getItem("couple-room-id")
-      if (!savedRoom) {
-        setShowSetup(true)
-      }
+      setShowSetup(true)
     }
   }, [ledger.hydrated])
 

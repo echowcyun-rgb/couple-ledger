@@ -9,6 +9,8 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
   | "members"
   | "getInTrendData"
   | "getOutTrendData"
+  | "getFinanceTrendData"
+  | "reviewSummary"
   | "expensePie"
   | "getYearExpensePie"
   | "structureStats"
@@ -29,6 +31,8 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
     members,
     getInTrendData,
     getOutTrendData,
+    getFinanceTrendData,
+    reviewSummary,
     expensePie,
     getYearExpensePie,
     structureStats,
@@ -65,6 +69,7 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
         <div className="stat-table">
           <div className="st-row"><span className="st-l">TOP3支出分类</span><span className="st-v">{habitAnalysis.topCategories.length ? habitAnalysis.topCategories.map((t) => `${t.name} ${yuan(t.amount)}(${t.pct}%)`).join(" · ") : "—"}</span></div>
           <div className="st-row"><span className="st-l">环比变化</span><span className="st-v">{habitAnalysis.momChange}</span></div>
+          <div className="st-row"><span className="st-l">当月理财收入</span><span className="st-v">{reviewSummary.financeIncome > 0 ? yuan(reviewSummary.financeIncome) : "暂无"}</span></div>
         </div>
         {habitAnalysis.bigSpends.length > 0 && (
           <div className="big-spend-alert">
@@ -114,6 +119,8 @@ export function ReviewTab({ ledger }: { ledger: Pick<Ledger,
       </div>
       <div className="section-title">收入趋势</div>
       <TrendCard getData={getInTrendData} members={members} totalColor="#3DAE83" refYear={reviewYear} refMonth={reviewMonth} />
+      <div className="section-title">理财趋势</div>
+      <TrendCard getData={getFinanceTrendData} members={members} totalColor="#A99BD6" refYear={reviewYear} refMonth={reviewMonth} />
       <div className="section-title">支出趋势</div>
       <TrendCard getData={getOutTrendData} members={members} totalColor="#D96A7E" refYear={reviewYear} refMonth={reviewMonth} />
       <div className="section-title">支出结构</div>

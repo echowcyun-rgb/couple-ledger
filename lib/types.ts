@@ -106,6 +106,7 @@ export interface MonthSummary {
   expense: number
   savings: number
   balance: number
+  financeIncome: number
 }
 
 export interface MemberSummary {

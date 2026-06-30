@@ -1,23 +1,30 @@
-import { Analytics } from '@vercel/analytics/next'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono, Press_Start_2P, DotGothic16 } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({
+const geistSans = localFont({
+  src: '../public/fonts/Geist-Variable.woff2',
+  variable: '--font-geist-sans',
+  display: 'swap',
+})
+
+const geistMono = localFont({
+  src: '../public/fonts/GeistMono-Variable.woff2',
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  display: 'swap',
 })
-const pressStart = Press_Start_2P({
+
+const pressStart = localFont({
+  src: '../public/fonts/PressStart2P-Regular.woff2',
   variable: '--font-pixel',
-  subsets: ['latin'],
-  weight: '400',
+  display: 'swap',
 })
-const dotGothic = DotGothic16({
+
+const dotGothic = localFont({
+  src: '../public/fonts/DotGothic16-Regular.woff2',
   variable: '--font-pixel-cjk',
-  subsets: ['latin'],
-  weight: '400',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -67,7 +74,6 @@ export default function RootLayout({
       <body className="font-sans antialiased" style={{ background: "#2B2440" }}>
         <Script src="/js/income-watch.js" strategy="afterInteractive" />
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )

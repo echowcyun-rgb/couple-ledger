@@ -117,10 +117,11 @@ export function HomeTab({
       </div>
 
       <div className="section-title">本月总览</div>
-      <div className="grid">
+      <div className="grid grid-5">
         <div className="stat"><div className="top"><span className="ico in">↗</span><span className="label">收入</span></div><div className="num">{yuan(monthSummary.income)}</div></div>
         <div className="stat"><div className="top"><span className="ico out">↘</span><span className="label">支出</span></div><div className="num">{yuan(monthSummary.expense)}</div></div>
         <div className="stat"><div className="top"><span className="ico save">⊙</span><span className="label">存钱</span></div><div className="num">{yuan(monthSummary.savings)}</div></div>
+        <div className="stat"><div className="top"><span className="ico finance">★</span><span className="label">理财</span></div><div className="num">{yuan(monthSummary.financeIncome)}</div></div>
         <div className="stat"><div className="top"><span className="ico net">▤</span><span className="label">结余</span></div><div className="num">{yuan(monthSummary.balance)}</div></div>
       </div>
 

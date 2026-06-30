@@ -32,7 +32,10 @@ export function getMonthSummary(transactions: Transaction[], year: number, month
   const income = sumByType(txs, "in")
   const expense = sumByType(txs, "out")
   const savings = sumByType(txs, "save")
-  return { income, expense, savings, balance: income - expense - savings }
+  const financeIncome = txs
+    .filter((t) => t.type === "in" && t.categoryKey === "finance")
+    .reduce((s, t) => s + t.amount, 0)
+  return { income, expense, savings, balance: income - expense - savings, financeIncome }
 }
 
 export function getMemberSummary(
@@ -122,6 +125,17 @@ export function getOutTrendData(
   refMonth: number
 ): TrendRow[] {
   return getTrendData(transactions, members, scope, refYear, refMonth, "out")
+}
+
+export function getFinanceTrendData(
+  transactions: Transaction[],
+  members: Member[],
+  scope: "year" | "month" | "day",
+  refYear: number,
+  refMonth: number
+): TrendRow[] {
+  const financeTxs = transactions.filter((t) => t.type === "in" && t.categoryKey === "finance")
+  return getTrendData(financeTxs, members, scope, refYear, refMonth, "in")
 }
 
 export function getExpensePie(

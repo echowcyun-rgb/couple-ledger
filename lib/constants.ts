@@ -18,6 +18,7 @@ export const INIT_CATS: Category[] = [
   { key: "med", glyph: "医", label: "医疗", type: "out" },
   { key: "salary", glyph: "薪", label: "工资", type: "in" },
   { key: "gift", glyph: "礼", label: "红包", type: "in" },
+  { key: "finance", glyph: "理", label: "理财", type: "in" },
   { key: "save", glyph: "储", label: "存钱", type: "save" },
 ]
 

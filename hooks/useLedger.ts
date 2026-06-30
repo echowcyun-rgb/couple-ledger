@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { SYS_AVATARS } from "@/lib/constants"
+import { SYS_AVATARS, INIT_CATS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud } from "@/lib/storage"
@@ -10,6 +10,7 @@ import { withRoomLock } from "@/lib/sync-lock"
 import {
   getInTrendData,
   getExpensePie,
+  getFinanceTrendData,
   getMemberSummary,
   getMonthSummary,
   getOutTrendData,
@@ -93,7 +94,7 @@ export function useLedger() {
   const [newGoalEmoji, setNewGoalEmoji] = useState("★")
   const [newGoalDeadline, setNewGoalDeadline] = useState("")
   const [updateGoalId, setUpdateGoalId] = useState<number | null>(null)
-  const [updateMode, setUpdateMode] = useState<"amount" | "pct">("amount")
+  const [updateMode, setUpdateMode] = useState<"amount" | "pct" | "finance">("amount")
   const [updateAmount, setUpdateAmount] = useState("")
   const [updateNote, setUpdateNote] = useState("")
   const [updateMemberId, setUpdateMemberId] = useState("")
@@ -164,6 +165,15 @@ export function useLedger() {
   useEffect(() => {
     setState(loadState())
     setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    setState((s) => {
+      if (s.cats.some((c) => c.key === "finance")) return s
+      const financeCat = INIT_CATS.find((c) => c.key === "finance")
+      if (!financeCat) return s
+      return { ...s, cats: [...s.cats, financeCat] }
+    })
   }, [])
 
   const toast = useCallback((msg: string) => {
@@ -546,8 +556,6 @@ export function useLedger() {
 
   const saveUpdateGoal = useCallback(() => {
     if (!updateGoal || updateGoalId === null) return
-    const num = Number(updateAmount)
-    if (!num || num < 0) { toast("请输入有效金额"); return }
     if (!updateMemberId) { toast("请选择经手人"); return }
     const todayStr = new Date().toLocaleDateString("zh-CN")
     let newCurrent: number
@@ -555,10 +563,20 @@ export function useLedger() {
     let historyNote: string
 
     if (updateMode === "pct") {
+      const num = Number(updateAmount)
+      if (!num || num < 0) { toast("请输入有效金额"); return }
       newCurrent = Math.round(updateGoal.target * (num / 100))
       historyAmount = newCurrent
       historyNote = updateNote || "手动更新"
+    } else if (updateMode === "finance") {
+      const financeAmount = monthSummary.financeIncome
+      if (financeAmount <= 0) { toast("当月暂无理财收入"); return }
+      newCurrent = updateGoal.current + financeAmount
+      historyAmount = financeAmount
+      historyNote = updateNote || "当月理财收入"
     } else {
+      const num = Number(updateAmount)
+      if (!num || num < 0) { toast("请输入有效金额"); return }
       newCurrent = updateGoal.current + num
       historyAmount = num
       historyNote = updateNote || "存入"
@@ -583,7 +601,7 @@ export function useLedger() {
     const msgs = generateCelebrateMessages(historyAmount, newCurrent, updateGoal.target)
     setCelebrateMsg(msgs)
     setCelebrateOpen(true)
-  }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, updateMemberId, toast])
+  }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, updateMemberId, monthSummary.financeIncome, toast])
 
   const editGoalHistory = useCallback((goalId: number, historyId: string, patchHist: Partial<Pick<GoalHistoryEntry, "amount" | "note">>) => {
     setState((s) => ({
@@ -1179,6 +1197,8 @@ export function useLedger() {
       getInTrendData(transactions, members, scope, reviewYear, reviewMonth),
     getOutTrendData: (scope: "year" | "month" | "day") =>
       getOutTrendData(transactions, members, scope, reviewYear, reviewMonth),
+    getFinanceTrendData: (scope: "year" | "month" | "day") =>
+      getFinanceTrendData(transactions, members, scope, reviewYear, reviewMonth),
     getYearExpensePie: () => getExpensePie(transactions, cats, reviewYear, reviewMonth, "year"),
     getTopCategories: () => getTopCategories(transactions, cats, reviewYear, reviewMonth),
   }

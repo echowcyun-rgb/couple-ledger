@@ -22,6 +22,7 @@ export function UpdateGoalSheet({
     | "saveUpdateGoal"
     | "editGoalHistory"
     | "deleteGoalHistory"
+    | "monthSummary"
   >
 }) {
   const {
@@ -40,7 +41,10 @@ export function UpdateGoalSheet({
     saveUpdateGoal,
     editGoalHistory,
     deleteGoalHistory,
+    monthSummary,
   } = ledger
+
+  const financeIncomeThisMonth = monthSummary?.financeIncome ?? 0
 
   const [saving, setSaving] = useState(false)
   const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null)
@@ -89,20 +93,35 @@ export function UpdateGoalSheet({
             <div className="upd-modes">
               <button className={`upd-mode ${updateMode === "amount" ? "on" : ""}`} onClick={() => setUpdateMode("amount")}>按金额</button>
               <button className={`upd-mode ${updateMode === "pct" ? "on" : ""}`} onClick={() => setUpdateMode("pct")}>当月总存款百分比</button>
+              <button className={`upd-mode ${updateMode === "finance" ? "on" : ""}`} onClick={() => setUpdateMode("finance")}>当月理财收入</button>
             </div>
-            <div className="upd-field-label">{updateMode === "amount" ? "本次存入（元）" : "占当月总存款百分比（%）"}</div>
-            <input
-              className="upd-input"
-              type="number"
-              inputMode="decimal"
-              placeholder={updateMode === "amount" ? "0" : "0"}
-              value={updateAmount}
-              onChange={(e) => setUpdateAmount(e.target.value)}
-            />
-            {updateMode === "amount" && updateAmount && !Number.isNaN(Number(updateAmount)) && Number(updateAmount) > 0 && (
-              <div className="upd-field-hint">
-                更新后将达到 ¥{updateGoal.current + Number(updateAmount)}
-              </div>
+            {updateMode === "finance" ? (
+              <>
+                <div className="upd-field-label">当月理财收入</div>
+                <div className="upd-finance-display">
+                  ¥{financeIncomeThisMonth}
+                </div>
+                <div className="upd-field-hint">
+                  更新后将达到 ¥{updateGoal.current + financeIncomeThisMonth}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="upd-field-label">{updateMode === "amount" ? "本次存入（元）" : "占当月总存款百分比（%）"}</div>
+                <input
+                  className="upd-input"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder={updateMode === "amount" ? "0" : "0"}
+                  value={updateAmount}
+                  onChange={(e) => setUpdateAmount(e.target.value)}
+                />
+                {updateMode === "amount" && updateAmount && !Number.isNaN(Number(updateAmount)) && Number(updateAmount) > 0 && (
+                  <div className="upd-field-hint">
+                    更新后将达到 ¥{updateGoal.current + Number(updateAmount)}
+                  </div>
+                )}
+              </>
             )}
             <div className="upd-field-label">备注（选填）</div>
             <input className="upd-input" placeholder="如：本月工资存入" value={updateNote} onChange={(e) => setUpdateNote(e.target.value)} />

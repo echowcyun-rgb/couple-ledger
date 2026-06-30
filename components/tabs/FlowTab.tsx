@@ -50,7 +50,7 @@ export function FlowTab({
   } = ledger
 
   // 类型筛选: "all" | "out" | "in" | "save"
-  const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save">("all")
+  const [typeFilter, setTypeFilter] = useState<"all" | "out" | "in" | "save" | "finance">("all")
   // 分类筛选
   const [catFilter, setCatFilter] = useState<string>("all")
 
@@ -67,7 +67,11 @@ export function FlowTab({
     .map(g => ({
       ...g,
       items: g.items.filter(i => {
-        if (typeFilter !== "all" && i.type !== typeFilter) return false
+        if (typeFilter === "finance") {
+          if (i.type !== "in" || i.cat !== "finance") return false
+        } else if (typeFilter !== "all" && i.type !== typeFilter) {
+          return false
+        }
         if (catFilter !== "all" && i.cat !== catFilter) return false
         return true
       })
@@ -202,7 +206,7 @@ export function FlowTab({
           {" "}▾
         </button>
         <div className="filters">
-          {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }]).map(f => (
+          {([{ k: "all" as const, label: "全部" }, { k: "out" as const, label: "支出" }, { k: "in" as const, label: "收入" }, { k: "save" as const, label: "存钱" }, { k: "finance" as const, label: "理财" }]).map(f => (
             <button key={f.k} className={`filter ${typeFilter === f.k ? "on" : ""}`} onClick={() => setTypeFilter(f.k)} type="button">{f.label}</button>
           ))}
         </div>

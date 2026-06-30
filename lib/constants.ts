@@ -26,7 +26,24 @@ export const DEFAULT_MEMBERS: Member[] = [
   { id: "yun", name: "小云", avatar: "/sys-av-1.png", gender: "male", payday: 10 },
 ]
 
-export const SYS_AVATARS = Array.from({ length: 10 }, (_, i) => `/sys-av-${i + 1}.png`)
+export const SYS_AVATARS_FEMALE = [
+  "/sys-av-1.png",
+  "/sys-av-3.png",
+  "/sys-av-5.png",
+  "/sys-av-7.png",
+  "/sys-av-9.png",
+]
+
+export const SYS_AVATARS_MALE = [
+  "/sys-av-2.png",
+  "/sys-av-4.png",
+  "/sys-av-6.png",
+  "/sys-av-8.png",
+  "/sys-av-10.png",
+]
+
+/** @deprecated 保留兼容，请按性别使用 SYS_AVATARS_FEMALE / SYS_AVATARS_MALE */
+export const SYS_AVATARS = [...SYS_AVATARS_FEMALE, ...SYS_AVATARS_MALE]
 
 export const PIE_COLORS = ["#F0A03C", "#F0CF3C", "#7FC8E8", "#D96A7E", "#3DAE83", "#A99BD6", "#E0A82E", "#6079C9"]
 

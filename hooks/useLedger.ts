@@ -653,28 +653,77 @@ export function useLedger() {
     toast("已删除成员")
   }, [members, patch, toast])
 
+  const compressImageFile = useCallback(
+    (file: File, maxSize: number, quality: number, type: "image/jpeg" | "image/png") =>
+      new Promise<string>((resolve, reject) => {
+        const img = new Image()
+        const objectUrl = URL.createObjectURL(file)
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas")
+            let w = img.width
+            let h = img.height
+            if (w > maxSize || h > maxSize) {
+              const ratio = Math.min(maxSize / w, maxSize / h)
+              w = Math.round(w * ratio)
+              h = Math.round(h * ratio)
+            }
+            canvas.width = w
+            canvas.height = h
+            const ctx = canvas.getContext("2d")
+            if (!ctx) {
+              reject(new Error("图片处理失败"))
+              return
+            }
+            ctx.drawImage(img, 0, 0, w, h)
+            resolve(type === "image/jpeg" ? canvas.toDataURL(type, quality) : canvas.toDataURL(type))
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error("图片处理失败"))
+          } finally {
+            URL.revokeObjectURL(objectUrl)
+          }
+        }
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl)
+          reject(new Error("图片加载失败"))
+        }
+        img.src = objectUrl
+      }),
+    []
+  )
+
   const onAvatarFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => setEditAvatar(ev.target!.result as string)
-    reader.readAsDataURL(file)
-    e.target.value = ""
-  }, [])
+    ;(async () => {
+      try {
+        const isJpeg = file.type === "image/jpeg" || file.type === "image/jpg"
+        const mime = isJpeg ? "image/jpeg" : "image/png"
+        const dataUrl = await compressImageFile(file, 200, 0.85, mime)
+        setEditAvatar(dataUrl)
+      } catch {
+        toast("头像处理失败，请重试")
+      } finally {
+        e.target.value = ""
+      }
+    })()
+  }, [compressImageFile, toast])
 
   const onCoupleBgFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const url = ev.target?.result as string
-      if (!url) return
-      setPendingCoupleBgUrl(url)
-      setCoupleBgAdjustOpen(true)
-    }
-    reader.readAsDataURL(file)
-    e.target.value = ""
-  }, [])
+    ;(async () => {
+      try {
+        const url = await compressImageFile(file, 800, 0.6, "image/jpeg")
+        setPendingCoupleBgUrl(url)
+        setCoupleBgAdjustOpen(true)
+      } catch {
+        toast("背景图处理失败，请重试")
+      } finally {
+        e.target.value = ""
+      }
+    })()
+  }, [compressImageFile, toast])
 
   const saveCoupleBgAdjust = useCallback(
     (posX: string, posY: string) => {

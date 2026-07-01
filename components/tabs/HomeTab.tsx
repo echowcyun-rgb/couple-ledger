@@ -8,6 +8,10 @@ export function HomeTab({
     Ledger,
     | "members"
     | "currentMonth"
+    | "homeYear"
+    | "homeMonth"
+    | "prevHomeMonth"
+    | "nextHomeMonth"
     | "goals"
     | "monthSummary"
     | "memberSummaries"
@@ -17,8 +21,24 @@ export function HomeTab({
     | "openUpdateGoal"
   >
 }) {
-  const { members, currentMonth, goals, monthSummary, memberSummaries, today, setGoalOpen, openRecord, openUpdateGoal } = ledger
+  const {
+    members,
+    currentMonth,
+    homeYear,
+    homeMonth,
+    prevHomeMonth,
+    nextHomeMonth,
+    goals,
+    monthSummary,
+    memberSummaries,
+    today,
+    setGoalOpen,
+    openRecord,
+    openUpdateGoal,
+  } = ledger
   const now = new Date()
+  const isCurrentHomeMonth =
+    homeYear === now.getFullYear() && homeMonth === now.getMonth() + 1
 
   // 存钱目标卡片底色（实心，不受头部遮罩影响）
   const GOAL_CARD_COLORS = [
@@ -116,7 +136,20 @@ export function HomeTab({
         </div>
       </div>
 
-      <div className="section-title">本月总览</div>
+      <div className="section-title home-overview-title">
+        <span>{isCurrentHomeMonth ? "本月总览" : "总览"}</span>
+        <div className="month-switch home-month-switch">
+          <button type="button" className="ms-btn" onClick={prevHomeMonth} aria-label="上一个月">
+            ◀
+          </button>
+          <span className="ms-now">
+            {homeYear}年{homeMonth}月
+          </span>
+          <button type="button" className="ms-btn" onClick={nextHomeMonth} aria-label="下一个月">
+            ▶
+          </button>
+        </div>
+      </div>
       <div className="grid grid-5">
         <div className="stat"><div className="top"><span className="ico in">↗</span><span className="label">收入</span></div><div className="num">{yuan(monthSummary.income)}</div></div>
         <div className="stat"><div className="top"><span className="ico out">↘</span><span className="label">支出</span></div><div className="num">{yuan(monthSummary.expense)}</div></div>
@@ -163,7 +196,7 @@ export function HomeTab({
                   <div className="member" key={m.id}>
                     <div className="mhead">
                       <img className={`pixavatar sm ${i === 0 ? "a" : "b"}`} src={m.avatar || "/placeholder.svg"} alt="" aria-hidden="true" />
-                      <div><div className="mname">{m.name}</div><div className="mtag">本月</div></div>
+                      <div><div className="mname">{m.name}</div><div className="mtag">{isCurrentHomeMonth ? "本月" : `${homeMonth}月`}</div></div>
                     </div>
                     <div className="rows">
                       <div className="r"><span>收入</span><b className="in">{yuan(ms?.income ?? 0)}</b></div>

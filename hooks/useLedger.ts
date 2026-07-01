@@ -195,6 +195,8 @@ export function useLedger() {
 
   const [reviewYear, setReviewYear] = useState(() => new Date().getFullYear())
   const [reviewMonth, setReviewMonth] = useState(() => new Date().getMonth() + 1)
+  const [homeYear, setHomeYear] = useState(() => new Date().getFullYear())
+  const [homeMonth, setHomeMonth] = useState(() => new Date().getMonth() + 1)
   const [planBudgetTarget, setPlanBudgetTarget] = useState("")
   const [planSavingsTarget, setPlanSavingsTarget] = useState("")
 
@@ -463,13 +465,13 @@ export function useLedger() {
   const coupleDays = coupleDaysFrom(startDate)
 
   const monthSummary = useMemo(
-    () => getMonthSummary(transactions, now.getFullYear(), currentMonth),
-    [transactions, now.getFullYear(), currentMonth]
+    () => getMonthSummary(transactions, homeYear, homeMonth),
+    [transactions, homeYear, homeMonth]
   )
 
   const memberSummaries = useMemo(
-    () => getMemberSummary(transactions, members, now.getFullYear(), currentMonth),
-    [transactions, members, now.getFullYear(), currentMonth]
+    () => getMemberSummary(transactions, members, homeYear, homeMonth),
+    [transactions, members, homeYear, homeMonth]
   )
 
   const reviewSummary = useMemo(
@@ -1280,6 +1282,40 @@ export function useLedger() {
     }
   }, [members, cats, importBatches, openImportPreview, toast])
 
+  const prevHomeMonth = useCallback(() => {
+    if (transactions.length === 0) {
+      toast("已是最早记录")
+      return
+    }
+    const earliest = transactions.reduce((min, t) => (t.date < min ? t.date : min), transactions[0].date)
+    const [ey, em] = earliest.split("-").map(Number)
+    if (homeYear < ey || (homeYear === ey && homeMonth <= em)) {
+      toast("已是最早记录")
+      return
+    }
+    if (homeMonth === 1) {
+      setHomeMonth(12)
+      setHomeYear((y) => y - 1)
+    } else {
+      setHomeMonth((m) => m - 1)
+    }
+  }, [transactions, homeYear, homeMonth, toast])
+
+  const nextHomeMonth = useCallback(() => {
+    const nowY = now.getFullYear()
+    const nowM = now.getMonth() + 1
+    if (homeYear > nowY || (homeYear === nowY && homeMonth >= nowM)) {
+      toast("已是最新记录")
+      return
+    }
+    if (homeMonth === 12) {
+      setHomeMonth(1)
+      setHomeYear((y) => y + 1)
+    } else {
+      setHomeMonth((m) => m + 1)
+    }
+  }, [homeYear, homeMonth, now, toast])
+
   const prevReviewMonth = useCallback(() => {
     if (transactions.length === 0) {
       toast("已是最早记录")
@@ -1442,6 +1478,8 @@ export function useLedger() {
     setEditAvatar,
     reviewYear,
     reviewMonth,
+    homeYear,
+    homeMonth,
     monthSummary,
     memberSummaries,
     reviewSummary,
@@ -1505,6 +1543,8 @@ export function useLedger() {
     celebrateOpen,
     celebrateMsg,
     setCelebrateOpen,
+    prevHomeMonth,
+    nextHomeMonth,
     prevReviewMonth,
     nextReviewMonth,
     toast,

@@ -130,6 +130,15 @@ export default function Page() {
         onRevert={ledger.revertImportBatch}
       />
 
+      {ledger.importParsing && (
+        <div className="import-parsing-overlay" role="status" aria-live="polite">
+          <div className="import-parsing-card">
+            <div className="import-parsing-spinner" aria-hidden="true" />
+            <div>正在解析账单…</div>
+          </div>
+        </div>
+      )}
+
       <Toast show={ledger.toastShow} msg={ledger.toastMsg} />
 
       {showPaydayAlert && (

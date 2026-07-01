@@ -5,7 +5,7 @@ import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS } from "@/lib/constants
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures, isRoomDeletedError } from "@/lib/storage"
-import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
+import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, pushTransactions, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
   getInTrendData,
@@ -150,6 +150,7 @@ export function useLedger() {
 
   const [revertImportOpen, setRevertImportOpen] = useState(false)
   const [revertImportLoading, setRevertImportLoading] = useState(false)
+  const [importParsing, setImportParsing] = useState(false)
 
   const [celebrateOpen, setCelebrateOpen] = useState(false)
   const [celebrateMsg, setCelebrateMsg] = useState("")
@@ -228,7 +229,21 @@ export function useLedger() {
       .then((count) => {
         if (gen !== syncGenerationRef.current) return
         resetCloudSyncFailures()
-        setState(loadState())
+        // 合并云端数据但保留本地未同步的修改（如刚导入但尚未推送的交易）
+        setState((prev) => {
+          const merged = loadState()
+          const localUnsynced = prev.transactions.filter((t) => !t.synced)
+          const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
+          for (const t of localUnsynced) {
+            if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
+          }
+          return {
+            ...merged,
+            transactions: Array.from(mergedMap.values()).sort(
+              (a, b) => b.createdAt - a.createdAt
+            ),
+          }
+        })
         if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
       })
       .catch((e: unknown) => {
@@ -253,6 +268,62 @@ export function useLedger() {
     if (!hydrated) return
     saveState(state, { push: allowPushRef.current })
   }, [state, hydrated])
+
+  // 定期 + 页面可见性变化时拉取云端数据（确保其他设备导入的数据同步到当前界面）
+  useEffect(() => {
+    if (!hydrated || !useCloud) return
+    const roomId = typeof window !== "undefined" ? localStorage.getItem("couple-room-id") : null
+    if (!roomId) return
+
+    let cancelled = false
+
+    const doPull = () => {
+      if (cancelled) return
+      if (!allowPushRef.current) return // 初始同步未完成，跳过
+      const gen = ++syncGenerationRef.current
+      syncFromCloud()
+        .then((count) => {
+          if (cancelled || gen !== syncGenerationRef.current) return
+          resetCloudSyncFailures()
+          // 合并云端数据但不覆盖本地未同步的修改
+          setState((prev) => {
+            const merged = loadState()
+            // 保留本地未同步的交易（synced != true 的）
+            const localUnsynced = prev.transactions.filter((t) => !t.synced)
+            const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
+            for (const t of localUnsynced) {
+              if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
+            }
+            return {
+              ...merged,
+              transactions: Array.from(mergedMap.values()).sort(
+                (a, b) => b.createdAt - a.createdAt
+              ),
+            }
+          })
+          if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
+        })
+        .catch((e: unknown) => {
+          if (cancelled || gen !== syncGenerationRef.current) return
+          if (isRoomDeletedError(e)) return
+          const message = e instanceof Error ? e.message : String(e)
+          reportCloudSyncFailure(message || "请检查网络")
+        })
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") doPull()
+    }
+
+    const interval = setInterval(doPull, 30_000)
+    document.addEventListener("visibilitychange", onVisible)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [hydrated, toast])
 
   const enterRoom = useCallback(async (roomId: string, options?: { fresh?: boolean }) => {
     syncGenerationRef.current++
@@ -287,7 +358,21 @@ export function useLedger() {
       const count = await syncFromCloud()
       if (gen !== syncGenerationRef.current) return
       resetCloudSyncFailures()
-      setState(loadState())
+      // 合并云端数据但保留本地未同步的修改
+      setState((prev) => {
+        const merged = loadState()
+        const localUnsynced = prev.transactions.filter((t) => !t.synced)
+        const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
+        for (const t of localUnsynced) {
+          if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
+        }
+        return {
+          ...merged,
+          transactions: Array.from(mergedMap.values()).sort(
+            (a, b) => b.createdAt - a.createdAt
+          ),
+        }
+      })
       if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
     } catch (e: unknown) {
       if (gen !== syncGenerationRef.current) return
@@ -927,7 +1012,23 @@ export function useLedger() {
 
     toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
     cancelImportPreview()
-  }, [importPreviewSource, importPreviewRecorder, importPreviewFileFingerprint, cancelImportPreview, toast])
+
+    // 立即推送到云端，不依赖 debounce（确保导入数据同步到其他设备）
+    if (useCloud && allowPushRef.current) {
+      const roomId =
+        state.roomId ||
+        (typeof window !== "undefined" ? localStorage.getItem("couple-room-id") || "" : "")
+      if (roomId && imported.length > 0) {
+        void withRoomLock(roomId, async () => {
+          await pushTransactions(imported, roomId)
+          await pushImportBatches([batch], roomId)
+        }).catch(() => {
+          // 推送失败不阻塞用户操作，debounce 会自动重试
+          console.warn("[import] 云端推送失败，稍后自动重试")
+        })
+      }
+    }
+  }, [importPreviewSource, importPreviewRecorder, importPreviewFileFingerprint, cancelImportPreview, toast, state.roomId])
 
   const openRevertImport = useCallback(() => {
     setRevertImportOpen(true)
@@ -1008,11 +1109,16 @@ export function useLedger() {
     pendingImportMemberRef.current = ""
     const lowerName = file.name.toLowerCase()
 
-    if (lowerName.endsWith(".csv")) {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        void (async () => {
-          try {
+    setImportParsing(true)
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      void (async () => {
+        try {
+          // yield 一次让加载提示先渲染，避免手机端卡顿无反馈
+          await new Promise((r) => setTimeout(r, 0))
+
+          if (lowerName.endsWith(".csv")) {
             const buffer = ev.target!.result as ArrayBuffer
             const text = decodeBillCsv(buffer)
             const source = detectSource(text, file.name)
@@ -1027,38 +1133,42 @@ export function useLedger() {
             }
 
             openImportPreview(await parseGenericCsv(text, members, cats, memberId), memberId, fileFingerprint)
-          } catch {
-            toast("文件解析失败，请确认是有效的 CSV 文件")
+            return
           }
-        })()
-      }
-      reader.readAsArrayBuffer(file)
-      e.target.value = ""
-      return
-    }
 
-    if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        void (async () => {
-          try {
+          if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
             openImportPreview(
               await parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats, memberId),
               memberId,
               fileFingerprint
             )
-          } catch {
-            toast("文件解析失败，请检查格式")
+            return
           }
-        })()
-      }
-      reader.readAsArrayBuffer(file)
+
+          toast("仅支持 .csv / .xlsx / .xls 格式")
+        } catch {
+          toast("文件解析失败，请确认是有效的账单文件")
+        } finally {
+          setImportParsing(false)
+          e.target.value = ""
+        }
+      })()
+    }
+    reader.onerror = () => {
+      setImportParsing(false)
       e.target.value = ""
-      return
+      toast("文件读取失败，请重试")
     }
 
-    toast("仅支持 .csv / .xlsx / .xls 格式")
-    e.target.value = ""
+    if (lowerName.endsWith(".csv")) {
+      reader.readAsArrayBuffer(file)
+    } else if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+      reader.readAsArrayBuffer(file)
+    } else {
+      setImportParsing(false)
+      e.target.value = ""
+      toast("仅支持 .csv / .xlsx / .xls 格式")
+    }
   }, [members, cats, openImportPreview, toast])
 
   const prevReviewMonth = useCallback(() => {
@@ -1280,6 +1390,7 @@ export function useLedger() {
     openRevertImport,
     closeRevertImport,
     revertImportBatch,
+    importParsing,
     deleteTransaction,
     exportTransactionsXlsx,
     celebrateOpen,

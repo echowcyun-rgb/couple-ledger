@@ -501,12 +501,188 @@ function buildGenericResult(
   }
 }
 
+// ===== 通用 CSV 快速解析（不依赖 xlsx 库）=====
+
+/** 判断是否为纯文本 CSV（而非 Excel 格式） */
+function looksLikePlainCsv(content: string): boolean {
+  // Excel 二进制格式（.xls 实为 HTML 表格等）不含换行或含 <table>
+  if (content.includes("<table") || content.includes("<html")) return false
+  const lines = content.split("\n").filter((l) => l.trim())
+  if (lines.length === 0) return false
+  // 至少有一行包含逗号或制表符，且不是二进制乱码
+  return lines.some((l) => l.includes(",") || l.includes("\t"))
+}
+
+/** 解析纯文本 CSV 为行对象数组 */
+function parsePlainCsvRows(content: string): Record<string, unknown>[] {
+  const text = content.replace(/^\uFEFF/, "")
+  const lines = text.split("\n").filter((l) => l.trim())
+  if (lines.length === 0) return []
+
+  // 确定分隔符
+  const sample = lines[0]
+  const delimiter = sample.includes("\t") ? "\t" : ","
+
+  // 找到表头行（包含 日期/金额/类型 等关键词）
+  let headerIdx = 0
+  for (let i = 0; i < Math.min(lines.length, 25); i++) {
+    const joined = lines[i].toLowerCase()
+    if (/日期|交易时间|交易日期|date/.test(joined) &&
+        /金额|数额|amount/.test(joined) &&
+        /类型|收\/支|收支|type/.test(joined)) {
+      headerIdx = i
+      break
+    }
+  }
+
+  const headers = parseDelimitedLine(lines[headerIdx], delimiter)
+  const headerMap = new Map<string, number>()
+  headers.forEach((h, idx) => {
+    const trimmed = h.trim()
+    if (trimmed) headerMap.set(trimmed, idx)
+  })
+
+  const rows: Record<string, unknown>[] = []
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = parseDelimitedLine(lines[i], delimiter)
+    if (cols.length < 3) continue
+    const row: Record<string, unknown> = {}
+    headers.forEach((h, idx) => {
+      if (h.trim()) row[h.trim()] = cols[idx] ?? ""
+    })
+    // 也用通用列名
+    if (!row["日期"] && !row["date"]) {
+      const dateVal = pickFromCols(cols, headerMap, "日期", "date", "交易时间", "交易日期", "记账日期")
+      if (dateVal) row["日期"] = dateVal
+    }
+    rows.push(row)
+  }
+  return rows
+}
+
+function pickFromCols(cols: string[], headerMap: Map<string, number>, ...names: string[]): string {
+  for (const name of names) {
+    const idx = headerMap.get(name)
+    if (idx != null && cols[idx] != null) return cols[idx].trim()
+  }
+  return ""
+}
+
+function parseDelimitedLine(line: string, delimiter: string): string[] {
+  const cols: string[] = []
+  let cur = ""
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (ch === delimiter && !inQuotes) {
+      cols.push(cur.trim())
+      cur = ""
+    } else {
+      cur += ch
+    }
+  }
+  cols.push(cur.trim())
+  return cols
+}
+
+/** 纯文本 CSV 行 → Transaction（不依赖 xlsx 日期解析） */
+function rowsToTransactionsPlain(
+  rows: Record<string, unknown>[],
+  members: Member[],
+  cats: Category[],
+  memberId: string
+): Transaction[] {
+  return rows
+    .map((row, idx) => {
+      if (isHeaderLikeRow(row)) return null
+
+      const date = parsePlainDate(
+        getCell(row, "date", "日期", "时间", "交易时间", "交易日期", "记账日期")
+      )
+      const type = parseImportType(
+        getCell(row, "type", "类型", "收支类型", "收/支", "收支")
+      )
+      const amount = parseImportAmount(
+        getCell(row, "amount", "金额", "数额", "交易金额", "金额(元)", "金额（元）")
+      )
+
+      const rawCategory = String(
+        getCell(row, "categoryKey", "分类", "category", "类别", "交易分类") ?? ""
+      ).trim()
+      const product = String(
+        getCell(row, "商品说明", "说明", "商品", "摘要") ?? ""
+      ).trim()
+      const remark = String(getCell(row, "note", "备注") ?? "").trim()
+      const counterparty = String(
+        getCell(row, "memberId", "成员", "member", "经手人", "交易对方") ?? ""
+      ).trim()
+
+      let resolvedMemberId = counterparty
+      if (resolvedMemberId) {
+        const matched = members.find((m) => m.id === resolvedMemberId || m.name === resolvedMemberId)
+        resolvedMemberId = matched?.id || resolvedMemberId
+      } else {
+        resolvedMemberId = members[0]?.id || memberId
+      }
+
+      if (!date || !type || !Number.isFinite(amount) || amount <= 0) return null
+
+      const explicitKey = resolveCategoryFromCell(rawCategory, cats)
+      const matchText = [product, remark, counterparty].filter(Boolean).join(" ")
+
+      return {
+        id: `tx_import_${Date.now()}_${idx}`,
+        date,
+        type,
+        amount: Math.abs(amount),
+        categoryKey: suggestCategory(matchText, type, cats, explicitKey),
+        memberId: resolvedMemberId,
+        note: noteFromDesc(product),
+        createdAt: Date.now() + idx,
+      }
+    })
+    .filter(Boolean) as Transaction[]
+}
+
+/** 纯文本日期解析（不依赖 xlsx） */
+function parsePlainDate(raw: unknown): string {
+  if (raw == null || raw === "") return ""
+  const s = String(raw).trim()
+  // YYYY-MM-DD or YYYY/MM/DD
+  const matched = s.match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/)
+  if (matched) {
+    return `${matched[1]}-${matched[2].padStart(2, "0")}-${matched[3].padStart(2, "0")}`
+  }
+  // YYYYMMDD
+  const compact = s.match(/^(\d{4})(\d{2})(\d{2})$/)
+  if (compact) {
+    return `${compact[1]}-${compact[2]}-${compact[3]}`
+  }
+  return s.slice(0, 10)
+}
+
 export async function parseGenericCsv(
   content: string,
   members: Member[],
   cats: Category[] = [],
   memberId?: string
 ): Promise<ImportResult> {
+  // 快速路径：纯文本 CSV 无需加载 xlsx 库（移动端可省数秒）
+  if (looksLikePlainCsv(content)) {
+    const recorder = memberId || members[0]?.id || ""
+    const rows = parsePlainCsvRows(content)
+    const transactions = rowsToTransactionsPlain(rows, members, cats, recorder)
+    return buildGenericResult(transactions, recorder)
+  }
+
+  // 回退到 xlsx 解析（处理 Excel 另存为 CSV 的特殊情况）
   const XLSX = await loadXlsx()
   const recorder = memberId || members[0]?.id || ""
   const text = content.replace(/^\uFEFF/, "")

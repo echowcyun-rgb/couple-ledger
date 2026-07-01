@@ -1,12 +1,18 @@
-/** 账单 CSV 解码：支付宝导出为 GBK，微信/通用多为 UTF-8 */
+/** 账单 CSV 解码：支付宝导出为 GBK，微信/通用多为 UTF-8
+ *  优化：先用 UTF-8 解码并检测是否有替换字符，仅在出现乱码时才尝试 GBK，
+ *  避免对大文件做两次完整解码（移动端可省一半时间）。
+ */
 export function decodeBillCsv(buffer: ArrayBuffer): string {
   const utf8 = decodeWithLabel(buffer, "utf-8")
-  const gbk = decodeWithLabel(buffer, "gbk")
-
-  const utf8Score = scoreBillText(utf8)
-  const gbkScore = scoreBillText(gbk)
-
-  const best = gbkScore > utf8Score ? gbk : utf8
+  // UTF-8 解码出现 U+FFFD 说明编码不对，才尝试 GBK
+  const hasBadChars = utf8.includes("\uFFFD")
+  let best = utf8
+  if (hasBadChars) {
+    const gbk = decodeWithLabel(buffer, "gbk")
+    const utf8Score = scoreBillText(utf8)
+    const gbkScore = scoreBillText(gbk)
+    best = gbkScore > utf8Score ? gbk : utf8
+  }
   return normalizeLineEndings(best.replace(/^\uFEFF/, ""))
 }
 

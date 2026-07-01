@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { decodeBillCsv } from "./csv-decode"
-import { detectSource, parseAlipayCSV } from "./importers"
+import { detectSource, parseAlipayCSV, parseGenericCsv } from "./importers"
 import { INIT_CATS } from "./constants"
 
 const ALIPAY_SAMPLE = `--------------------
@@ -44,7 +44,46 @@ describe("parseAlipayCSV", () => {
       note: "滴滴快车打",
     })
     expect(result.transactions[0].note).toHaveLength(5)
-    expect(result.transactions[1].categoryKey).toBe("food")
-    expect(result.transactions[1].note).toBe("美团外卖订")
+  expect(result.transactions[1].categoryKey).toBe("food")
+  expect(result.transactions[1].note).toBe("美团外卖订")
+})
+
+describe("parseGenericCsv fast path", () => {
+  it("纯文本 CSV 无需 xlsx 库即可解析", async () => {
+    const csv = `日期,类型,金额,商品说明,备注
+2026-06-01,支出,50.00,超市购物,
+2026-06-02,收入,5000.00,工资,6月工资
+2026-06-03,存钱,1000.00,定期存款,`
+    const result = await parseGenericCsv(csv, [{ id: "m1", name: "我", avatar: "", gender: "female", payday: 10 }], INIT_CATS, "m1")
+    expect(result.batch.source).toBe("generic")
+    expect(result.transactions).toHaveLength(3)
+    expect(result.transactions[0]).toMatchObject({
+      date: "2026-06-01",
+      type: "out",
+      amount: 50,
+    })
+    expect(result.transactions[1]).toMatchObject({
+      date: "2026-06-02",
+      type: "in",
+      amount: 5000,
+    })
+    expect(result.transactions[2]).toMatchObject({
+      date: "2026-06-03",
+      type: "save",
+      amount: 1000,
+    })
   })
+
+  it("制表符分隔的 CSV 也能解析", async () => {
+    const tsv = `日期\t类型\t金额\t商品说明
+2026-06-01\t支出\t25.50\t咖啡`
+    const result = await parseGenericCsv(tsv, [{ id: "m1", name: "我", avatar: "", gender: "female", payday: 10 }], INIT_CATS, "m1")
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0]).toMatchObject({
+      date: "2026-06-01",
+      type: "out",
+      amount: 25.5,
+    })
+  })
+})
 })

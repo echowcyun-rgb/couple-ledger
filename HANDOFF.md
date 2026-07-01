@@ -139,6 +139,9 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_x TEXT DEFAULT '50%';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_y TEXT DEFAULT 'center';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
 
+-- 分类列表（JSONB，含系统默认 + 自定义分类）
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS cats JSONB DEFAULT '[]';
+
 -- goals completedAt 列
 ALTER TABLE goals ADD COLUMN IF NOT EXISTS "completedAt" TEXT DEFAULT NULL;
 
@@ -158,6 +161,18 @@ ALTER TABLE members DISABLE ROW LEVEL SECURITY;
 ALTER TABLE import_batches DISABLE ROW LEVEL SECURITY;
 ```
 验证结果：5 张表列结构完全匹配代码，3 个唯一索引已建，RLS 全部关闭 ✅
+
+## 分类与背景云同步（第十五轮）
+
+- **分类 `cats`**：存储在 `couples.cats` JSONB，`pushToCloud` 推送、`syncFromCloud` 拉取；云端自定义分类覆盖本地，系统默认 `INIT_CATS` 通过 `mergeCats` / `mergeCatsFromCloud` 始终保留
+- **情侣背景 `coupleBg`**：已有同步（`couples.couple_bg_url/pos_x/pos_y`，见 `lib/storage.ts` pushToCloud + syncFromCloud）
+- **成员头像**：随 `members.avatar` 表同步（已有）
+
+### 用户需手动执行的 Supabase SQL（若尚未执行）
+
+```sql
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS cats JSONB DEFAULT '[]';
+```
 
 ## 测试要求
 - ✅ `npm run build` + `npm test`（37 passed）

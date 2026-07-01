@@ -82,6 +82,11 @@ export function mergeCatsUnion(lists: Category[][]): Category[] {
   return Array.from(map.values())
 }
 
+/** 云端 cats 覆盖本地自定义分类，系统默认 INIT_CATS 始终保留 */
+export function mergeCatsFromCloud(cloud: Category[]): Category[] {
+  return mergeCatsUnion([cloud])
+}
+
 /** 云同步写盘前，合并同步过程中用户在本地改动的字段（分类/主题等不上云表结构的字段） */
 function preserveLocalOnlyFields(target: AppState): void {
   const latest = loadState()
@@ -581,7 +586,7 @@ export async function syncFromCloud(): Promise<number> {
           local.startDate = row.start_date
         }
         if (Array.isArray(row.cats) && row.cats.length > 0) {
-          local.cats = mergeCatsUnion([local.cats, row.cats])
+          local.cats = mergeCatsFromCloud(row.cats)
         }
         if (row.couple_bg_url) {
           local.coupleBg = normalizeCoupleBg({

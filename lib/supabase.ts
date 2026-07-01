@@ -4,6 +4,7 @@
  * 读取优先读本地，云只用来合并
  */
 import { createClient, type PostgrestError } from "@supabase/supabase-js"
+import { INIT_CATS } from "./constants"
 import type { Transaction, Goal, Member, ImportBatch, AppState } from "./types"
 import { withRetry, withTimeout } from "./sync-utils"
 
@@ -379,7 +380,7 @@ export async function createRoom(): Promise<string> {
     const roomId = generateCode()
     const { error } = await supabase
       .from("couples")
-      .insert({ room_id: roomId, start_date: today })
+      .insert({ room_id: roomId, start_date: today, cats: INIT_CATS })
 
     if (!error) return roomId
 

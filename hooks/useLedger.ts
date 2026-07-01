@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS, MAX_IMPORT_FILE_BYTES, MAX_IMAGE_FILE_BYTES } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
-import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures, isRoomDeletedError } from "@/lib/storage"
+import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures, isRoomDeletedError, mergeCatsUnion } from "@/lib/storage"
 import { deleteCloudTransaction, deleteCloudTransactions, deleteCloudGoals, pushImportBatches, pushTransactions, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
@@ -100,6 +100,10 @@ function mergeStateAfterCloudSync(prev: AppState, merged: AppState): AppState {
     ...merged,
     transactions: Array.from(mergedMap.values()).sort((a, b) => b.createdAt - a.createdAt),
     importBatches,
+    cats: mergeCatsUnion([merged.cats, prev.cats]),
+    theme: prev.theme,
+    remindOn: prev.remindOn,
+    activeGoalId: prev.activeGoalId ?? merged.activeGoalId,
   }
 }
 

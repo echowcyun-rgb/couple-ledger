@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS couples (
   couple_bg_url TEXT DEFAULT '',
   couple_bg_pos_x TEXT DEFAULT '50%',
   couple_bg_pos_y TEXT DEFAULT 'center',
-  start_date TEXT DEFAULT ''
+  start_date TEXT DEFAULT '',
+  cats JSONB DEFAULT '[]'
 );
 
 -- 2. 交易记录表（带 room_id）
@@ -94,6 +95,7 @@ ALTER TABLE import_batches DISABLE ROW LEVEL SECURITY;
 
 -- 增量迁移（已有库执行，不必删表）
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS cats JSONB DEFAULT '[]';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_url TEXT DEFAULT '';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_x TEXT DEFAULT '50%';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_y TEXT DEFAULT 'center';

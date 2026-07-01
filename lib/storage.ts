@@ -3,7 +3,7 @@ import { normalizeCoupleBg } from "./couple-bg"
 import { supabase, useCloud, pullImportBatches, pushImportBatches, validateRoom, pullMembers, pullGoals, deleteCloudMembers, deleteCloudGoals } from "./supabase"
 import { withRoomLock } from "./sync-lock"
 import { withRetry, withTimeout } from "./sync-utils"
-import type { AppState, Goal, Member, Transaction } from "./types"
+import type { AppState, Goal, Member, Transaction, Category } from "./types"
 import type { PostgrestError } from "@supabase/supabase-js"
 
 // ===== 类型迁移工具（保持不变） =====
@@ -69,12 +69,26 @@ function migrateGoal(g: StoredGoal): Goal {
 }
 
 function mergeCats(saved: AppState["cats"]) {
-  const keys = new Set(saved.map((c) => c.key))
-  const merged = [...saved]
-  for (const c of INIT_CATS) {
-    if (!keys.has(c.key)) merged.push(c)
+  return mergeCatsUnion([saved])
+}
+
+/** 合并多份分类列表：保证 INIT_CATS 齐全，同 key 后者覆盖前者 */
+export function mergeCatsUnion(lists: Category[][]): Category[] {
+  const map = new Map<string, Category>()
+  for (const c of INIT_CATS) map.set(c.key, { ...c })
+  for (const list of lists) {
+    for (const c of list) map.set(c.key, c)
   }
-  return merged
+  return Array.from(map.values())
+}
+
+/** 云同步写盘前，合并同步过程中用户在本地改动的字段（分类/主题等不上云表结构的字段） */
+function preserveLocalOnlyFields(target: AppState): void {
+  const latest = loadState()
+  target.cats = mergeCatsUnion([target.cats, latest.cats])
+  target.theme = latest.theme
+  target.remindOn = latest.remindOn
+  target.activeGoalId = latest.activeGoalId
 }
 
 const MAX_MEMBERS = 2
@@ -337,7 +351,7 @@ async function pushToCloud(state: AppState): Promise<void> {
 
   await runSupabaseVoid(() =>
     supabase!.from("couples").upsert(
-      { room_id: roomId, start_date: state.startDate || "" },
+      { room_id: roomId, start_date: state.startDate || "", cats: state.cats },
       { onConflict: "room_id" }
     )
   )
@@ -553,7 +567,7 @@ export async function syncFromCloud(): Promise<number> {
       }
 
       const coupleData = await runSupabaseQuery(() =>
-        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y, start_date").eq("room_id", roomId).maybeSingle()
+        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y, start_date, cats").eq("room_id", roomId).maybeSingle()
       )
       if (coupleData) {
         const row = coupleData as {
@@ -561,9 +575,13 @@ export async function syncFromCloud(): Promise<number> {
           couple_bg_pos_x?: string
           couple_bg_pos_y?: string
           start_date?: string
+          cats?: Category[]
         }
         if (row.start_date) {
           local.startDate = row.start_date
+        }
+        if (Array.isArray(row.cats) && row.cats.length > 0) {
+          local.cats = mergeCatsUnion([local.cats, row.cats])
         }
         if (row.couple_bg_url) {
           local.coupleBg = normalizeCoupleBg({
@@ -574,6 +592,7 @@ export async function syncFromCloud(): Promise<number> {
         }
       }
 
+      preserveLocalOnlyFields(local)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(local))
       return mergedCount
     } catch (e: unknown) {

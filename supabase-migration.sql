@@ -14,7 +14,10 @@ DROP TABLE IF EXISTS couples CASCADE;
 -- 1. 情侣房间表
 CREATE TABLE IF NOT EXISTS couples (
   room_id TEXT PRIMARY KEY,
-  created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
+  created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000),
+  couple_bg_url TEXT DEFAULT '',
+  couple_bg_pos_x TEXT DEFAULT '50%',
+  couple_bg_pos_y TEXT DEFAULT 'center'
 );
 
 -- 2. 交易记录表（带 room_id）

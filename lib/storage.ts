@@ -275,6 +275,10 @@ async function pushToCloud(state: AppState): Promise<void> {
   const roomId = resolveRoomId(state)
   if (!roomId) return
 
+  await runSupabaseVoid(() =>
+    supabase!.from("couples").upsert({ room_id: roomId }, { onConflict: "room_id" })
+  )
+
   const CHUNK = 50
   for (let i = 0; i < state.transactions.length; i += CHUNK) {
     const chunk = state.transactions.slice(i, i + CHUNK).map((tx) => txToRow(tx, roomId))

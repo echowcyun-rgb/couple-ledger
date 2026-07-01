@@ -17,12 +17,20 @@ export function PwaRegister() {
     let reloaded = false
     const reloadOnce = () => {
       if (reloaded) return
+      // 首次安装尚无 controller，跳过 reload 避免加载两次
+      if (!navigator.serviceWorker.controller) return
       reloaded = true
       window.location.reload()
     }
 
+    const checkUpdate = () => {
+      void navigator.serviceWorker.getRegistration().then((reg) => {
+        if (reg) void reg.update()
+      })
+    }
+
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("/sw.js", { updateViaCache: "none" })
       .then((reg) => {
         void reg.update()
         reg.addEventListener("updatefound", () => {
@@ -35,17 +43,31 @@ export function PwaRegister() {
           })
         })
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.warn("[PWA] Service Worker 注册失败:", err)
+        window.dispatchEvent(
+          new CustomEvent("ledger-cloud-error", {
+            detail: "PWA 离线缓存注册失败，可刷新页面重试",
+          })
+        )
+      })
 
     const onControllerChange = () => reloadOnce()
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange)
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") checkUpdate()
+    }
+    document.addEventListener("visibilitychange", onVisible)
 
     const onInstall = (e: Event) => {
       e.preventDefault()
     }
     window.addEventListener("beforeinstallprompt", onInstall)
+
     return () => {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange)
+      document.removeEventListener("visibilitychange", onVisible)
       window.removeEventListener("beforeinstallprompt", onInstall)
     }
   }, [])

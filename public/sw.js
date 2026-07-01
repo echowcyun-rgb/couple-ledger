@@ -1,4 +1,4 @@
-const CACHE_NAME = "couple-ledger-v32"
+const CACHE_NAME = "couple-ledger-v33"
 
 const LOCAL_ASSETS = [
   "./manifest.json",
@@ -7,6 +7,7 @@ const LOCAL_ASSETS = [
   "./icon-512.png",
   "./icon-maskable.png",
   "./apple-touch-icon.png",
+  "./js/income-watch.js",
   // 底部导航栏图标
   "./tabbar/home.png",
   "./tabbar/home-active.png",
@@ -34,35 +35,55 @@ const LOCAL_ASSETS = [
   "./avatars/boy.jpg",
 ]
 
+const ALLOWED_PATHS = new Set(
+  LOCAL_ASSETS.map((p) => (p === "./" ? "/" : p.replace(/^\.\//, "/")))
+)
+
 /** Next.js 动态资源不缓存，避免刷新后 JS 不匹配 */
 function shouldCache(url) {
   if (url.pathname.startsWith("/_next/")) return false
   if (url.pathname.startsWith("/api/")) return false
-  return LOCAL_ASSETS.some((p) => {
-    const path = p === "./" ? "/" : p.replace("./", "/")
-    return url.pathname === path || url.pathname.endsWith(p.slice(1))
-  })
+  return ALLOWED_PATHS.has(url.pathname)
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      Promise.all(
-        LOCAL_ASSETS.map((url) =>
-          fetch(url, { mode: "no-cors" })
-            .then((res) => cache.put(url, res))
-            .catch((err) => console.warn("[SW] 缓存失败:", url, err))
+    caches
+      .open(CACHE_NAME)
+      .then((cache) =>
+        Promise.all(
+          LOCAL_ASSETS.map((url) =>
+            fetch(url)
+              .then((res) => (res.ok ? cache.put(url, res) : Promise.resolve()))
+              .catch((err) => console.warn("[SW] 缓存失败:", url, err))
+          )
         )
       )
-    ).then(() => self.skipWaiting())
+      .then(() => self.skipWaiting())
   )
 })
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      )
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) =>
+        cache.keys().then((requests) =>
+          Promise.all(
+            requests
+              .filter((req) => {
+                const path = new URL(req.url).pathname
+                return !ALLOWED_PATHS.has(path)
+              })
+              .map((req) => cache.delete(req))
+          )
+        )
+      )
+      .then(() => self.clients.claim())
   )
 })
 
@@ -71,23 +92,31 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url)
   if (url.origin !== self.location.origin) return
 
-  // HTML 文档始终走网络，避免缓存旧版 shell 与新版 _next 资源不匹配导致 hydration 失败
+  // HTML 文档始终走网络且 bypass HTTP 缓存，避免旧 shell 与新版 _next 资源不匹配
   if (
     event.request.mode === "navigate" ||
     event.request.destination === "document" ||
     url.pathname === "/" ||
     url.pathname === ""
   ) {
-    event.respondWith(fetch(event.request))
+    event.respondWith(fetch(event.request, { cache: "no-store" }))
     return
   }
 
   if (!shouldCache(url)) return
 
+  // stale-while-revalidate：先返回缓存，后台更新
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached
-      return fetch(event.request)
+      const network = fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()))
+          }
+          return response
+        })
+        .catch(() => cached)
+      return cached || network
     })
   )
 })

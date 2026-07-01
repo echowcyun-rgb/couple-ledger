@@ -87,6 +87,7 @@ describe("supabase cloud helpers", () => {
   })
 
   it("pullTransactions 正常返回映射后的交易", async () => {
+    vi.useRealTimers()
     const row = {
       id: "tx1",
       date: "2026-01-01",
@@ -100,7 +101,7 @@ describe("supabase cloud helpers", () => {
       created_at: 1,
     }
     const chain = makeChain({ data: [row], error: null })
-    chain.limit = vi.fn().mockResolvedValue({ data: [row], error: null })
+    chain.order = vi.fn().mockResolvedValue({ data: [row], error: null })
     mockFrom.mockReturnValue(chain)
 
     const { pullTransactions } = await loadSupabase()
@@ -112,12 +113,13 @@ describe("supabase cloud helpers", () => {
       memberId: "wu",
       synced: true,
     })
+    vi.useFakeTimers()
   })
 
   it("可重试错误会重试后成功", async () => {
     const chain = makeChain({ data: [], error: null })
     let calls = 0
-    chain.limit = vi.fn().mockImplementation(() => {
+    chain.order = vi.fn().mockImplementation(() => {
       calls += 1
       if (calls === 1) {
         return Promise.resolve({

@@ -715,3 +715,30 @@ export async function parseGenericXlsx(
   )
   return buildGenericResult(transactions, recorder)
 }
+
+/** xlsx/xls：先转 CSV 文本检测来源，支付宝/微信走专用解析 */
+export async function parseBillXlsx(
+  buffer: ArrayBuffer,
+  members: Member[],
+  cats: Category[] = [],
+  memberId?: string,
+  fileName = ""
+): Promise<ImportResult> {
+  const XLSX = await loadXlsx()
+  const recorder = memberId || members[0]?.id || ""
+  const wb = XLSX.read(new Uint8Array(buffer), { type: "array", cellDates: true })
+  const sheet = wb.Sheets[wb.SheetNames[0]]
+  if (!sheet) return buildGenericResult([], recorder)
+
+  const csvText = XLSX.utils.sheet_to_csv(sheet)
+  const source = detectSource(csvText, fileName)
+
+  if (source === "alipay") {
+    return parseAlipayCSV(csvText, recorder, cats)
+  }
+  if (source === "wechat") {
+    return parseWechatCSV(csvText, recorder, cats)
+  }
+
+  return parseGenericXlsx(buffer, members, cats, memberId)
+}

@@ -1,9 +1,12 @@
 {
+  "id": "/",
   "name": "情侣记账",
   "short_name": "记账",
   "description": "情侣一起记账",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "lang": "zh-CN",
   "background_color": "#2B2440",
   "theme_color": "#2B2440",
   "icons": [

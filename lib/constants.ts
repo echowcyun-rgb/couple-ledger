@@ -3,6 +3,11 @@ import { DEFAULT_COUPLE_BG } from "./couple-bg"
 
 export const STORAGE_KEY = "couple-ledger-v1"
 
+/** 账单导入文件大小上限（15MB） */
+export const MAX_IMPORT_FILE_BYTES = 15 * 1024 * 1024
+/** 头像/背景图上传大小上限（8MB） */
+export const MAX_IMAGE_FILE_BYTES = 8 * 1024 * 1024
+
 export const THEMES: Record<ThemeKey, { label: string; accent: string; accentDark: string; dot: string }> = {
   mint: { label: "草莓薄荷", accent: "#3DAE83", accentDark: "#2F9670", dot: "#3DAE83" },
   peach: { label: "蜜桃汽水", accent: "#D96A7E", accentDark: "#C0566A", dot: "#D96A7E" },

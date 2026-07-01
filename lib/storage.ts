@@ -1,8 +1,8 @@
 import { createDefaultState, INIT_CATS, STORAGE_KEY } from "./constants"
 import { normalizeCoupleBg } from "./couple-bg"
-import { supabase, useCloud, pullImportBatches, pushImportBatches, validateRoom } from "./supabase"
+import { supabase, useCloud, pullImportBatches, pushImportBatches, validateRoom, pullMembers, pullGoals, deleteCloudMembers, deleteCloudGoals } from "./supabase"
 import { withRoomLock } from "./sync-lock"
-import { isPostgrestError, withRetry, withTimeout } from "./sync-utils"
+import { withRetry, withTimeout } from "./sync-utils"
 import type { AppState, Goal, Member, Transaction } from "./types"
 import type { PostgrestError } from "@supabase/supabase-js"
 
@@ -104,6 +104,12 @@ function emitCloudError(message: string) {
   }
 }
 
+function emitPushSuccess() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ledger-push-ok"))
+  }
+}
+
 /** 将 Supabase 错误转为用户可理解的提示 */
 function formatCloudSyncError(message: string): string {
   if (/row-level security|42501/i.test(message)) {
@@ -180,7 +186,6 @@ export function loadState(): AppState {
   }
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 /** 等待执行或正在执行的 push 数量；>3 时在弱网下可能积压 */
 let pushQueueDepth = 0
@@ -221,10 +226,6 @@ async function ensureRoomExistsForPush(roomId: string): Promise<boolean> {
 
 /** 取消尚未执行的本地保存与云端推送（换房 / 重进房间前调用） */
 export function cancelPendingSync(): void {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
   if (pushTimer) {
     clearTimeout(pushTimer)
     pushTimer = null
@@ -279,6 +280,7 @@ export async function flushAndPushState(state: AppState): Promise<void> {
   try {
     await withRoomLock(roomId, () => pushToCloud(state))
     onCloudSyncSuccess()
+    emitPushSuccess()
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     reportCloudSyncFailure(message)
@@ -290,17 +292,12 @@ export function saveState(state: AppState, options?: { push?: boolean }): void {
   if (typeof window === "undefined") return
   const shouldPush = options?.push !== false
 
-  // 1. 立即写 localStorage（离线可用）
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-    } catch {
-      console.warn("localStorage save failed")
-    }
-  }, 300)
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    console.warn("localStorage save failed")
+  }
 
-  // 2. 云推送可延迟（初始同步完成前禁止，避免空数据覆盖云端）
   if (!shouldPush || !useCloud) return
 
   if (pushTimer) clearTimeout(pushTimer)
@@ -316,8 +313,9 @@ export function saveState(state: AppState, options?: { push?: boolean }): void {
       }
 
       try {
-        await withRoomLock(roomId, () => pushToCloud(state))
+        await withRoomLock(roomId, () => pushToCloud(loadState()))
         onCloudSyncSuccess()
+        emitPushSuccess()
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e)
         reportCloudSyncFailure(message)
@@ -365,13 +363,15 @@ async function pushToCloud(state: AppState): Promise<void> {
       gender: m.gender,
       payday: m.payday,
     }))
-    // 先删后写，避免云端残留旧 id 成员导致同步后变成 4 人
-    await runSupabaseVoid(() =>
-      supabase!.from("members").delete().eq("room_id", roomId)
-    )
     await runSupabaseVoid(() =>
       supabase!.from("members").upsert(memberRows, { onConflict: "room_id,id" })
     )
+    const keepIds = new Set(capped.map((m) => m.id))
+    const cloudMembers = await pullMembers(roomId)
+    const orphanIds = cloudMembers.filter((m) => !keepIds.has(m.id)).map((m) => m.id)
+    if (orphanIds.length > 0) {
+      await deleteCloudMembers(orphanIds, roomId)
+    }
   } else {
     await runSupabaseVoid(() =>
       supabase!.from("members").delete().eq("room_id", roomId)
@@ -394,14 +394,20 @@ async function pushToCloud(state: AppState): Promise<void> {
     await runSupabaseVoid(() =>
       supabase!.from("goals").upsert(goalRows, { onConflict: "room_id,id" })
     )
+    const keepGoalIds = new Set(state.goals.map((g) => g.id))
+    const cloudGoals = await pullGoals(roomId)
+    const orphanGoalIds = cloudGoals.filter((g) => !keepGoalIds.has(g.id)).map((g) => g.id)
+    if (orphanGoalIds.length > 0) {
+      await deleteCloudGoals(orphanGoalIds, roomId)
+    }
+  } else {
+    await runSupabaseVoid(() =>
+      supabase!.from("goals").delete().eq("room_id", roomId)
+    )
   }
 
-  try {
-    if (state.importBatches.length > 0) {
-      await pushImportBatches(state.importBatches, roomId)
-    }
-  } catch (e) {
-    console.warn("推送导入批次到云端失败:", e)
+  if (state.importBatches.length > 0) {
+    await pushImportBatches(state.importBatches, roomId)
   }
 
   if (state.coupleBg && state.coupleBg.url) {
@@ -427,6 +433,12 @@ export async function syncFromCloud(): Promise<number> {
     let mergedCount = 0
 
     try {
+      const roomExists = await validateRoom(roomId)
+      if (!roomExists) {
+        clearRoomCache()
+        throw new Error("ROOM_DELETED")
+      }
+
       const txData = await runSupabaseQuery(() =>
         supabase!
           .from("transactions")
@@ -454,8 +466,16 @@ export async function syncFromCloud(): Promise<number> {
         const cloudMap = new Map(cloudTxns.map((t) => [t.id, t]))
 
         for (const [id, ct] of cloudMap) {
-          if (!localMap.has(id)) mergedCount++
-          localMap.set(id, ct)
+          const lt = localMap.get(id)
+          if (!lt) {
+            mergedCount++
+            localMap.set(id, ct)
+          } else if (lt.synced === false) {
+            // 本地有未推送修改，保留本地版本
+            continue
+          } else {
+            localMap.set(id, ct)
+          }
         }
 
         // 本地已同步但云端已删除的记录应移除，避免旧数据残留
@@ -516,9 +536,16 @@ export async function syncFromCloud(): Promise<number> {
       if (cloudBatches.length > 0) {
         const batchMap = new Map(local.importBatches.map((b) => [b.time, b]))
         for (const cb of cloudBatches) {
-          // 保留本地 batch 的 fileFingerprint（云端无此字段）
           const localBatch = batchMap.get(cb.time)
-          batchMap.set(cb.time, localBatch ? { ...cb, fileFingerprint: localBatch.fileFingerprint } : cb)
+          batchMap.set(
+            cb.time,
+            localBatch
+              ? {
+                  ...cb,
+                  fileFingerprint: localBatch.fileFingerprint ?? cb.fileFingerprint,
+                }
+              : cb
+          )
         }
         local.importBatches = Array.from(batchMap.values()).sort((a, b) =>
           b.time.localeCompare(a.time)
@@ -526,7 +553,7 @@ export async function syncFromCloud(): Promise<number> {
       }
 
       const coupleData = await runSupabaseQuery(() =>
-        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y, start_date").eq("room_id", roomId).single()
+        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y, start_date").eq("room_id", roomId).maybeSingle()
       )
       if (coupleData) {
         const row = coupleData as {
@@ -550,10 +577,6 @@ export async function syncFromCloud(): Promise<number> {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(local))
       return mergedCount
     } catch (e: unknown) {
-      if (isPostgrestError(e) && e.code === "PGRST116") {
-        clearRoomCache()
-        throw new Error("ROOM_DELETED")
-      }
       const message = e instanceof Error ? e.message : String(e)
       throw new Error(message || "cloud sync failed")
     }

@@ -50,8 +50,10 @@ CREATE TABLE IF NOT EXISTS goals (
   contributions JSONB DEFAULT '{}',
   history JSONB DEFAULT '[]',
   deadline TEXT DEFAULT '',
+  "completedAt" TEXT DEFAULT NULL,
   updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_goals_room_id ON goals(room_id, id);
 CREATE INDEX IF NOT EXISTS idx_goals_room ON goals(room_id);
 
 -- 4. 成员表（带 room_id）
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS members (
   payday INTEGER DEFAULT 10,
   updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_members_room_id ON members(room_id, id);
 CREATE INDEX IF NOT EXISTS idx_members_room ON members(room_id);
 
 -- 5. 导入批次表（带 room_id）
@@ -75,8 +78,11 @@ CREATE TABLE IF NOT EXISTS import_batches (
   recorder TEXT NOT NULL,
   count INTEGER NOT NULL,
   time TEXT NOT NULL,
+  status TEXT DEFAULT 'active',
+  file_fingerprint TEXT DEFAULT NULL,
   created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_import_batches_room_time ON import_batches(room_id, time);
 CREATE INDEX IF NOT EXISTS idx_import_batches_room ON import_batches(room_id);
 
 -- 关闭行级安全（匿名 key 需要读写权限）
@@ -88,3 +94,12 @@ ALTER TABLE import_batches DISABLE ROW LEVEL SECURITY;
 
 -- 增量迁移（已有库执行，不必删表）
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_url TEXT DEFAULT '';
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_x TEXT DEFAULT '50%';
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_y TEXT DEFAULT 'center';
+ALTER TABLE goals ADD COLUMN IF NOT EXISTS "completedAt" TEXT DEFAULT NULL;
+ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS file_fingerprint TEXT DEFAULT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_members_room_id ON members(room_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_goals_room_id ON goals(room_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_import_batches_room_time ON import_batches(room_id, time);

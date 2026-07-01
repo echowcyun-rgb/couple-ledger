@@ -15,7 +15,7 @@ const tx = (overrides: Partial<Transaction>): Transaction => ({
 })
 
 describe("importDedupKey", () => {
-  it("同一 date/type/amount 生成相同 key", () => {
+  it("同一 date/type/amount/member/note 生成相同 key", () => {
     const a = importDedupKey(tx({ amount: 99.99 }))
     const b = importDedupKey(tx({ id: "2", amount: 99.99 }))
     expect(a).toBe(b)
@@ -23,6 +23,12 @@ describe("importDedupKey", () => {
 
   it("金额分位不同则 key 不同", () => {
     expect(importDedupKey(tx({ amount: 10 }))).not.toBe(importDedupKey(tx({ amount: 10.01 })))
+  })
+
+  it("不同成员同金额则 key 不同", () => {
+    expect(importDedupKey(tx({ memberId: "a", amount: 50 }))).not.toBe(
+      importDedupKey(tx({ memberId: "b", amount: 50 }))
+    )
   })
 })
 
@@ -33,5 +39,11 @@ describe("markImportDuplicates", () => {
     const marked = markImportDuplicates(incoming, existing)
     expect(marked[0].isDuplicate).toBe(true)
     expect(marked[1].isDuplicate).toBe(false)
+  })
+
+  it("同文件内重复行也标记", () => {
+    const marked = markImportDuplicates([tx({ id: "n1" }), tx({ id: "n2" })], [])
+    expect(marked[0].isDuplicate).toBe(false)
+    expect(marked[1].isDuplicate).toBe(true)
   })
 })

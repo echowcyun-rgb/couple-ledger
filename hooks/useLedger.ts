@@ -1,11 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS } from "@/lib/constants"
+import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS, MAX_IMPORT_FILE_BYTES, MAX_IMAGE_FILE_BYTES } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures, isRoomDeletedError } from "@/lib/storage"
-import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, pushTransactions, useCloud } from "@/lib/supabase"
+import { deleteCloudTransaction, deleteCloudTransactions, deleteCloudGoals, pushImportBatches, pushTransactions, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
   getInTrendData,
@@ -28,12 +28,13 @@ import {
   detectSource,
   GENERIC_BILL_IMPORT_HINT,
   parseAlipayCSV,
+  parseBillXlsx,
   parseGenericCsv,
-  parseGenericXlsx,
   parseWechatCSV,
   type ImportResult,
 } from "@/lib/importers"
 import { decodeBillCsv } from "@/lib/csv-decode"
+import { dedupeImportTransactions } from "@/lib/import-dedup"
 import { loadXlsx } from "@/lib/xlsx"
 import type {
   AppState,
@@ -89,13 +90,16 @@ function mergeStateAfterCloudSync(prev: AppState, merged: AppState): AppState {
   const localUnsynced = prev.transactions.filter((t) => !t.synced)
   const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
   for (const t of localUnsynced) {
-    if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
+    mergedMap.set(t.id, t)
   }
+
+  const importBatches = mergeImportBatchesAfterSync(merged.importBatches, prev.importBatches)
+  syncImportedFilesFromBatches(importBatches)
 
   return {
     ...merged,
     transactions: Array.from(mergedMap.values()).sort((a, b) => b.createdAt - a.createdAt),
-    importBatches: mergeImportBatchesAfterSync(merged.importBatches, prev.importBatches),
+    importBatches,
   }
 }
 
@@ -254,8 +258,18 @@ export function useLedger() {
       const msg = (e as CustomEvent<string>).detail
       toast(msg || "云同步失败")
     }
+    const onPushOk = () => {
+      setState((s) => ({
+        ...s,
+        transactions: s.transactions.map((t) => ({ ...t, synced: true })),
+      }))
+    }
     window.addEventListener("ledger-cloud-error", onCloudError)
-    return () => window.removeEventListener("ledger-cloud-error", onCloudError)
+    window.addEventListener("ledger-push-ok", onPushOk)
+    return () => {
+      window.removeEventListener("ledger-cloud-error", onCloudError)
+      window.removeEventListener("ledger-push-ok", onPushOk)
+    }
   }, [toast])
 
   // 后台云同步：不阻塞主界面，同步完成后再允许 saveState
@@ -298,7 +312,6 @@ export function useLedger() {
         if (gen !== syncGenerationRef.current) return
         allowPushRef.current = true
         setCloudSynced(true)
-        saveState(loadState(), { push: false })
       })
   }, [hydrated, toast])
 
@@ -393,7 +406,6 @@ export function useLedger() {
       if (gen === syncGenerationRef.current) {
         allowPushRef.current = true
         setCloudSynced(true)
-        saveState(loadState(), { push: false })
       }
     }
   }, [toast])
@@ -580,6 +592,7 @@ export function useLedger() {
                 categoryKey: recCat,
                 memberId: recMemberId,
                 note: recNote.trim(),
+                synced: false,
               }
             : t
         ),
@@ -598,6 +611,7 @@ export function useLedger() {
       memberId: recMemberId,
       note: recNote.trim(),
       createdAt: Date.now(),
+      synced: false,
     }
     setState((s) => {
       let nextGoals = s.goals
@@ -704,7 +718,16 @@ export function useLedger() {
       }
     })
     toast("已删除目标")
-  }, [toast])
+
+    const roomId =
+      state.roomId ||
+      (typeof window !== "undefined" ? localStorage.getItem("couple-room-id") || "" : "")
+    if (useCloud && roomId) {
+      void withRoomLock(roomId, () => deleteCloudGoals([id], roomId)).catch(() => {
+        toast("删除已生效，云同步失败，稍后自动重试")
+      })
+    }
+  }, [toast, state.roomId])
 
   const openEditGoal = useCallback((id: number) => {
     const goal = goals.find(g => g.id === id)
@@ -926,6 +949,11 @@ export function useLedger() {
   const onAvatarFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > MAX_IMAGE_FILE_BYTES) {
+      toast("图片过大，请选择 8MB 以内的图片")
+      e.target.value = ""
+      return
+    }
     ;(async () => {
       try {
         const isJpeg = file.type === "image/jpeg" || file.type === "image/jpg"
@@ -943,6 +971,11 @@ export function useLedger() {
   const onCoupleBgFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > MAX_IMAGE_FILE_BYTES) {
+      toast("图片过大，请选择 8MB 以内的图片")
+      e.target.value = ""
+      return
+    }
     ;(async () => {
       try {
         const url = await compressImageFile(file, 800, 0.6, "image/jpeg")
@@ -994,11 +1027,20 @@ export function useLedger() {
   }, [])
 
   const confirmImportPreview = useCallback((imported: Transaction[]) => {
+    const uniqueImported = dedupeImportTransactions(imported).map((t) => ({
+      ...t,
+      synced: false,
+    }))
+    if (uniqueImported.length === 0) {
+      toast("没有可导入的记录")
+      return
+    }
+
     const batch: ImportBatch = {
-      ids: imported.map((t) => t.id),
+      ids: uniqueImported.map((t) => t.id),
       source: importPreviewSource,
       recorder: importPreviewRecorder,
-      count: imported.length,
+      count: uniqueImported.length,
       time: new Date().toISOString(),
       status: "active",
       fileFingerprint: importPreviewFileFingerprint || undefined,
@@ -1006,7 +1048,7 @@ export function useLedger() {
     setState((s) => {
       const next = {
         ...s,
-        transactions: [...imported, ...s.transactions],
+        transactions: [...uniqueImported, ...s.transactions],
         importBatches: [batch, ...s.importBatches],
       }
       flushStateSync(next)
@@ -1022,13 +1064,13 @@ export function useLedger() {
           ? "微信"
           : "通用"
 
-    toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
+    toast(`✅ 已导入 ${uniqueImported.length} 条${sourceLabel}账单`)
 
     // 月份提醒：导入的交易不在当前查看月份时提示用户切换
     const nowDate = new Date()
     const currentYearMonth = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`
     const monthCounts = new Map<string, number>()
-    for (const t of imported) {
+    for (const t of uniqueImported) {
       const ym = t.date.slice(0, 7)
       monthCounts.set(ym, (monthCounts.get(ym) || 0) + 1)
     }
@@ -1052,11 +1094,20 @@ export function useLedger() {
       const roomId =
         state.roomId ||
         (typeof window !== "undefined" ? localStorage.getItem("couple-room-id") || "" : "")
-      if (roomId && imported.length > 0) {
+      if (roomId && uniqueImported.length > 0) {
         void withRoomLock(roomId, async () => {
-          await pushTransactions(imported, roomId)
+          await pushTransactions(uniqueImported, roomId)
           await pushImportBatches([batch], roomId)
-        }).catch(() => {
+        })
+          .then(() => {
+            setState((s) => ({
+              ...s,
+              transactions: s.transactions.map((t) =>
+                batch.ids.includes(t.id) ? { ...t, synced: true } : t
+              ),
+            }))
+          })
+          .catch(() => {
           // 推送失败不阻塞用户操作，debounce 会自动重试
           console.warn("[import] 云端推送失败，稍后自动重试")
         })
@@ -1137,6 +1188,12 @@ export function useLedger() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      toast("文件过大，请选择 15MB 以内的账单文件")
+      e.target.value = ""
+      return
+    }
+
     const fileFingerprint = `${file.name}|${file.size}|${file.lastModified}`
     const hasActiveDuplicate = importBatches.some(
       (b) => b.status !== "reverted" && b.fileFingerprint === fileFingerprint
@@ -1180,7 +1237,13 @@ export function useLedger() {
 
           if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
             openImportPreview(
-              await parseGenericXlsx(ev.target!.result as ArrayBuffer, members, cats, memberId),
+              await parseBillXlsx(
+                ev.target!.result as ArrayBuffer,
+                members,
+                cats,
+                memberId,
+                file.name
+              ),
               memberId,
               fileFingerprint
             )

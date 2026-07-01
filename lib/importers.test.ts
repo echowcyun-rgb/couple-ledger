@@ -44,8 +44,9 @@ describe("parseAlipayCSV", () => {
       note: "滴滴快车打",
     })
     expect(result.transactions[0].note).toHaveLength(5)
-  expect(result.transactions[1].categoryKey).toBe("food")
-  expect(result.transactions[1].note).toBe("美团外卖订")
+    expect(result.transactions[1].categoryKey).toBe("food")
+    expect(result.transactions[1].note).toBe("美团外卖订")
+  })
 })
 
 describe("parseGenericCsv fast path", () => {
@@ -85,5 +86,4 @@ describe("parseGenericCsv fast path", () => {
       amount: 25.5,
     })
   })
-})
 })

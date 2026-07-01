@@ -107,7 +107,6 @@ export async function pullTransactions(roomId: string): Promise<Transaction[]> {
         .select("*")
         .eq("room_id", roomId)
         .order("created_at", { ascending: false })
-        .limit(500)
     )
     return (data || []).map((r) => rowToTx(r as Record<string, unknown>))
   } catch (e) {
@@ -221,6 +220,13 @@ export async function pushGoals(goals: Goal[], roomId: string): Promise<boolean>
   }
 }
 
+export async function deleteCloudGoals(ids: number[], roomId: string): Promise<void> {
+  if (!supabase || ids.length === 0) return
+  await runSupabaseVoid(() =>
+    supabase!.from("goals").delete().in("id", ids).eq("room_id", roomId)
+  )
+}
+
 // ===== 成员同步 =====
 
 export async function pullMembers(roomId: string): Promise<Member[]> {
@@ -243,6 +249,13 @@ export async function pullMembers(roomId: string): Promise<Member[]> {
     console.warn("拉取云端成员失败:", e)
     return []
   }
+}
+
+export async function deleteCloudMembers(ids: string[], roomId: string): Promise<void> {
+  if (!supabase || ids.length === 0) return
+  await runSupabaseVoid(() =>
+    supabase!.from("members").delete().in("id", ids).eq("room_id", roomId)
+  )
 }
 
 export async function pushMembers(members: Member[], roomId: string): Promise<boolean> {
@@ -288,6 +301,7 @@ export async function pullImportBatches(roomId: string): Promise<ImportBatch[]> 
         count: row.count as number,
         time: row.time as string,
         status: status === "reverted" ? "reverted" : "active",
+        fileFingerprint: (row.file_fingerprint as string) || undefined,
       }
     })
   } catch (e) {
@@ -307,6 +321,7 @@ export async function pushImportBatches(batches: ImportBatch[], roomId: string):
       count: b.count,
       time: b.time,
       status: b.status || "active",
+      file_fingerprint: b.fileFingerprint || null,
     }))
     await runSupabaseVoid(() =>
       supabase!.from("import_batches").upsert(rows, { onConflict: "room_id,time" })
@@ -337,7 +352,7 @@ export async function validateRoom(roomId: string): Promise<boolean> {
   return !!data
 }
 
-/** 创建新房间，返回房号 */
+/** 创建新房间，返回房号（等待 Supabase 写入完成，避免进房时 sync 竞态） */
 export async function createRoom(): Promise<string> {
   if (!supabase) {
     const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
@@ -356,19 +371,28 @@ export async function createRoom(): Promise<string> {
     console.warn("[createRoom] 本地模式生成房号失败，已达最大尝试次数")
     return ""
   }
+
   const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
-  const roomId = generateCode()
   const today = new Date().toISOString().slice(0, 10)
-  void supabase
-    .from("couples")
-    .insert({ room_id: roomId, start_date: today })
-    .then(({ error }) => {
-      if (error) {
-        console.warn("[createRoom] background insert failed:", error)
-        emitCloudError("账本创建同步失败，请检查网络后重试")
-      }
-    })
-  return roomId
+
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const roomId = generateCode()
+    const { error } = await supabase
+      .from("couples")
+      .insert({ room_id: roomId, start_date: today })
+
+    if (!error) return roomId
+
+    // 房号冲突，重试
+    if (error.code === "23505") continue
+
+    console.warn("[createRoom] insert failed:", error)
+    emitCloudError("账本创建同步失败，请检查网络后重试")
+    throw new Error(error.message || "create room failed")
+  }
+
+  emitCloudError("账本创建失败，请重试")
+  throw new Error("create room failed: too many collisions")
 }
 
 // ===== 全量同步：启动时拉取云端数据合并到本地 =====

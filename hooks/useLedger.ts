@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { SYS_AVATARS, INIT_CATS } from "@/lib/constants"
+import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
 import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState } from "@/lib/storage"
@@ -762,11 +762,14 @@ export function useLedger() {
       return
     }
     const id = `m_${Date.now()}`
-    const defaultName = members.length === 0 ? "我" : `成员${members.length + 1}`
+    const isFirst = members.length === 0
+    const defaultName = isFirst ? "我" : "成员2"
+    const gender = isFirst ? "female" : "male"
+    const avatar = isFirst ? SYS_AVATARS_FEMALE[0] : SYS_AVATARS_MALE[0]
     patch({
       members: [
         ...members,
-        { id, name: defaultName, avatar: SYS_AVATARS[members.length % SYS_AVATARS.length], gender: "other", payday: 10 },
+        { id, name: defaultName, avatar, gender, payday: 10 },
       ],
     })
     toast("已添加新成员")

@@ -23,23 +23,23 @@ export const INIT_CATS: Category[] = [
 ]
 
 export const DEFAULT_MEMBERS: Member[] = [
-  { id: "wu", name: "小五", avatar: "/sys-av-6.png", gender: "female", payday: 10 },
-  { id: "yun", name: "小云", avatar: "/sys-av-1.png", gender: "male", payday: 10 },
+  { id: "wu", name: "小五", avatar: "/sys-av-1.png", gender: "female", payday: 10 },
+  { id: "yun", name: "小云", avatar: "/sys-av-2.png", gender: "male", payday: 10 },
 ]
 
 export const SYS_AVATARS_FEMALE = [
   "/sys-av-1.png",
   "/sys-av-3.png",
   "/sys-av-5.png",
-  "/sys-av-7.png",
-  "/sys-av-9.png",
+  "/sys-av-6.png",
+  "/sys-av-8.png",
 ]
 
 export const SYS_AVATARS_MALE = [
   "/sys-av-2.png",
   "/sys-av-4.png",
-  "/sys-av-6.png",
-  "/sys-av-8.png",
+  "/sys-av-7.png",
+  "/sys-av-9.png",
   "/sys-av-10.png",
 ]
 

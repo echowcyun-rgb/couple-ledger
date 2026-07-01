@@ -1,4 +1,4 @@
-const CACHE_NAME = "couple-ledger-v29"
+const CACHE_NAME = "couple-ledger-v30"
 
 const LOCAL_ASSETS = [
   "./manifest.json",
@@ -7,6 +7,31 @@ const LOCAL_ASSETS = [
   "./icon-512.png",
   "./icon-maskable.png",
   "./apple-touch-icon.png",
+  // 底部导航栏图标
+  "./tabbar/home.png",
+  "./tabbar/home-active.png",
+  "./tabbar/flow.png",
+  "./tabbar/flow-active.png",
+  "./tabbar/record.png",
+  "./tabbar/record-active.png",
+  "./tabbar/review.png",
+  "./tabbar/review-active.png",
+  "./tabbar/mine.png",
+  "./tabbar/mine-active.png",
+  // 系统头像
+  "./sys-av-1.png",
+  "./sys-av-2.png",
+  "./sys-av-3.png",
+  "./sys-av-4.png",
+  "./sys-av-5.png",
+  "./sys-av-6.png",
+  "./sys-av-7.png",
+  "./sys-av-8.png",
+  "./sys-av-9.png",
+  "./sys-av-10.png",
+  // RoomSetup 角色图
+  "./avatars/girl.jpg",
+  "./avatars/boy.jpg",
 ]
 
 /** Next.js 动态资源不缓存，避免刷新后 JS 不匹配 */

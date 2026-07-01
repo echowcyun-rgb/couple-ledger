@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react"
 import type { Category, ImportBatch, Transaction } from "@/lib/types"
 import { yuan } from "@/lib/format"
 import { markImportDuplicates } from "@/lib/import-dedup"
-import { useSheetSwipe } from "@/hooks/useSheetSwipe"
 
 export const IMPORT_SOURCE_LABELS: Record<ImportBatch["source"], string> = {
   alipay: "支付宝",

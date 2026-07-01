@@ -28,7 +28,7 @@ describe("category-keywords", () => {
   })
 
   it("新增默认支出分类关键词", () => {
-    expect(matchCategoryByKeywords("宠物医院", "out", INIT_CATS)).toBe("pet")
+    expect(matchCategoryByKeywords("猫粮狗粮", "out", INIT_CATS)).toBe("pet")
     expect(matchCategoryByKeywords("医美护肤", "out", INIT_CATS)).toBe("beauty")
     expect(matchCategoryByKeywords("口红彩妆", "out", INIT_CATS)).toBe("cosmetics")
     expect(matchCategoryByKeywords("婚礼份子钱", "out", INIT_CATS)).toBe("social")

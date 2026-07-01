@@ -99,6 +99,7 @@ export interface ImportBatch {
   count: number
   time: string
   status?: "active" | "reverted"
+  fileFingerprint?: string
 }
 
 export interface MonthSummary {

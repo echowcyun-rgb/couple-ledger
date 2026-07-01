@@ -990,6 +990,7 @@ export function useLedger() {
       count: imported.length,
       time: new Date().toISOString(),
       status: "active",
+      fileFingerprint: importPreviewFileFingerprint || undefined,
     }
     setState((s) => ({
       ...s,
@@ -1011,6 +1012,28 @@ export function useLedger() {
     }
 
     toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
+
+    // 月份提醒：导入的交易不在当前查看月份时提示用户切换
+    const nowDate = new Date()
+    const currentYearMonth = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`
+    const monthCounts = new Map<string, number>()
+    for (const t of imported) {
+      const ym = t.date.slice(0, 7)
+      monthCounts.set(ym, (monthCounts.get(ym) || 0) + 1)
+    }
+    if (!monthCounts.has(currentYearMonth) && monthCounts.size > 0) {
+      // 取最多交易的月份
+      let topMonth = ""
+      let topCount = 0
+      for (const [ym, cnt] of monthCounts) {
+        if (cnt > topCount) { topCount = cnt; topMonth = ym }
+      }
+      const [y, m] = topMonth.split("-")
+      setTimeout(() => {
+        toast(`📅 导入的账单集中在 ${y}年${parseInt(m)}月，请在流水页切换月份查看`)
+      }, 2000)
+    }
+
     cancelImportPreview()
 
     // 立即推送到云端，不依赖 debounce（确保导入数据同步到其他设备）
@@ -1052,6 +1075,17 @@ export function useLedger() {
     const idsSet = new Set(batch.ids)
     const deleteCount = batch.ids.length
     const updatedBatch: ImportBatch = { ...batch, status: "reverted" }
+
+    // 清除文件指纹，允许用户重新导入同一文件
+    if (batch.fileFingerprint) {
+      try {
+        const importedFingerprints = JSON.parse(localStorage.getItem("imported-files") || "[]") as string[]
+        const filtered = importedFingerprints.filter((fp) => fp !== batch.fileFingerprint)
+        localStorage.setItem("imported-files", JSON.stringify(filtered))
+      } catch {
+        // 忽略 localStorage 读取错误
+      }
+    }
 
     setState((s) => ({
       ...s,

@@ -515,7 +515,9 @@ export async function syncFromCloud(): Promise<number> {
       if (cloudBatches.length > 0) {
         const batchMap = new Map(local.importBatches.map((b) => [b.time, b]))
         for (const cb of cloudBatches) {
-          batchMap.set(cb.time, cb)
+          // 保留本地 batch 的 fileFingerprint（云端无此字段）
+          const localBatch = batchMap.get(cb.time)
+          batchMap.set(cb.time, localBatch ? { ...cb, fileFingerprint: localBatch.fileFingerprint } : cb)
         }
         local.importBatches = Array.from(batchMap.values()).sort((a, b) =>
           b.time.localeCompare(a.time)

@@ -320,6 +320,12 @@ export async function pushImportBatches(batches: ImportBatch[], roomId: string):
 
 // ===== 房间管理 =====
 
+function emitCloudError(message: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ledger-cloud-error", { detail: message }))
+  }
+}
+
 /** 验证房号是否存在；网络/超时错误向上抛出，供 RoomSetup 展示 */
 export async function validateRoom(roomId: string): Promise<boolean> {
   if (!supabase) {
@@ -351,22 +357,17 @@ export async function createRoom(): Promise<string> {
     return ""
   }
   const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
-  let roomId = generateCode()
-  let attempts = 0
-  while (attempts < 10) {
-    const exists = await validateRoom(roomId)
-    if (!exists) {
-      try {
-        await runSupabaseVoid(() => supabase!.from("couples").insert({ room_id: roomId }))
-        return roomId
-      } catch {
-        // 碰撞或 transient 错误，换号重试
+  const roomId = generateCode()
+  void supabase
+    .from("couples")
+    .insert({ room_id: roomId })
+    .then(({ error }) => {
+      if (error) {
+        console.warn("[createRoom] background insert failed:", error)
+        emitCloudError("账本创建同步失败，请检查网络后重试")
       }
-    }
-    roomId = generateCode()
-    attempts++
-  }
-  return ""
+    })
+  return roomId
 }
 
 // ===== 全量同步：启动时拉取云端数据合并到本地 =====

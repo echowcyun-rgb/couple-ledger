@@ -1,6 +1,6 @@
 import { createDefaultState, INIT_CATS, STORAGE_KEY } from "./constants"
 import { normalizeCoupleBg } from "./couple-bg"
-import { supabase, useCloud, pullImportBatches, pushImportBatches } from "./supabase"
+import { supabase, useCloud, pullImportBatches, pushImportBatches, validateRoom } from "./supabase"
 import { withRoomLock } from "./sync-lock"
 import { withRetry, withTimeout } from "./sync-utils"
 import type { AppState, Goal, Member, Transaction } from "./types"
@@ -183,6 +183,40 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 /** 等待执行或正在执行的 push 数量；>3 时在弱网下可能积压 */
 let pushQueueDepth = 0
+/** 连续云同步（推送）失败次数；≥3 后仅 console 警告，不再弹 toast */
+let consecutivePushFailures = 0
+
+const PUSH_DEBOUNCE_MS = 2500
+
+export function resetCloudSyncFailures(): void {
+  consecutivePushFailures = 0
+}
+
+function onCloudSyncSuccess(): void {
+  consecutivePushFailures = 0
+}
+
+/** 上报云同步失败；连续失败 ≥3 次后收敛为 console 警告 */
+export function reportCloudSyncFailure(message: string): void {
+  consecutivePushFailures++
+  const formatted = formatCloudSyncError(message)
+  if (consecutivePushFailures < 3) {
+    emitCloudError(formatted)
+  } else {
+    console.warn("[sync] cloud sync failed", consecutivePushFailures, "times:", formatted)
+  }
+}
+
+async function ensureRoomExistsForPush(roomId: string): Promise<boolean> {
+  const roomExists = await validateRoom(roomId)
+  if (!roomExists) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("couple-room-id")
+    }
+    return false
+  }
+  return true
+}
 
 /** 取消尚未执行的本地保存与云端推送（换房 / 重进房间前调用） */
 export function cancelPendingSync(): void {
@@ -225,7 +259,16 @@ export async function flushAndPushState(state: AppState): Promise<void> {
   if (!useCloud || !supabase) return
   const roomId = resolveRoomId(state)
   if (!roomId) return
-  await withRoomLock(roomId, () => pushToCloud(state))
+  if (!(await ensureRoomExistsForPush(roomId))) return
+
+  try {
+    await withRoomLock(roomId, () => pushToCloud(state))
+    onCloudSyncSuccess()
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e)
+    reportCloudSyncFailure(message)
+    throw e
+  }
 }
 
 export function saveState(state: AppState, options?: { push?: boolean }): void {
@@ -247,23 +290,27 @@ export function saveState(state: AppState, options?: { push?: boolean }): void {
 
   if (pushTimer) clearTimeout(pushTimer)
   pushTimer = setTimeout(() => {
-    const roomId = resolveRoomId(state)
-    if (!roomId) return
+    void (async () => {
+      const roomId = resolveRoomId(state)
+      if (!roomId) return
+      if (!(await ensureRoomExistsForPush(roomId))) return
 
-    pushQueueDepth++
-    if (pushQueueDepth > 3) {
-      console.warn("[sync] push 排队超过 3，可能在弱网或频繁编辑下积压")
-    }
+      pushQueueDepth++
+      if (pushQueueDepth > 3) {
+        console.warn("[sync] push 排队超过 3，可能在弱网或频繁编辑下积压")
+      }
 
-    withRoomLock(roomId, () => pushToCloud(state))
-      .catch((e: unknown) => {
+      try {
+        await withRoomLock(roomId, () => pushToCloud(state))
+        onCloudSyncSuccess()
+      } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e)
-        emitCloudError(formatCloudSyncError(message))
-      })
-      .finally(() => {
+        reportCloudSyncFailure(message)
+      } finally {
         pushQueueDepth--
-      })
-  }, 1000)
+      }
+    })()
+  }, PUSH_DEBOUNCE_MS)
 }
 
 // ===== 云同步 =====

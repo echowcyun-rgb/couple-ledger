@@ -1,6 +1,7 @@
-const CACHE_NAME = "couple-ledger-v30"
+const CACHE_NAME = "couple-ledger-v31"
 
 const LOCAL_ASSETS = [
+  "./",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",
@@ -38,12 +39,23 @@ const LOCAL_ASSETS = [
 function shouldCache(url) {
   if (url.pathname.startsWith("/_next/")) return false
   if (url.pathname.startsWith("/api/")) return false
-  return LOCAL_ASSETS.some((p) => url.pathname === p.replace("./", "/") || url.pathname.endsWith(p.slice(1)))
+  return LOCAL_ASSETS.some((p) => {
+    const path = p === "./" ? "/" : p.replace("./", "/")
+    return url.pathname === path || url.pathname.endsWith(p.slice(1))
+  })
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(LOCAL_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(
+        LOCAL_ASSETS.map((url) =>
+          fetch(url, { mode: "no-cors" })
+            .then((res) => cache.put(url, res))
+            .catch((err) => console.warn("[SW] 缓存失败:", url, err))
+        )
+      )
+    ).then(() => self.skipWaiting())
   )
 })
 
@@ -62,6 +74,12 @@ self.addEventListener("fetch", (event) => {
   if (!shouldCache(url)) return
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached
+      if (url.pathname === "/" || url.pathname === "") {
+        return caches.match("./").then((home) => home || fetch(event.request))
+      }
+      return fetch(event.request)
+    })
   )
 })

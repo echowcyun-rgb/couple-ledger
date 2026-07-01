@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
-import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState } from "@/lib/storage"
+import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures } from "@/lib/storage"
 import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
@@ -227,19 +227,20 @@ export function useLedger() {
     syncFromCloud()
       .then((count) => {
         if (gen !== syncGenerationRef.current) return
+        resetCloudSyncFailures()
         setState(loadState())
         if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
       })
       .catch((e: unknown) => {
         if (gen !== syncGenerationRef.current) return
         const message = e instanceof Error ? e.message : String(e)
-        toast(`云同步失败：${message || "请检查网络"}`)
+        reportCloudSyncFailure(message || "请检查网络")
       })
       .finally(() => {
         if (gen !== syncGenerationRef.current) return
         allowPushRef.current = true
         setCloudSynced(true)
-        saveState(loadState(), { push: true })
+        saveState(loadState(), { push: false })
       })
   }, [hydrated, toast])
 
@@ -280,17 +281,18 @@ export function useLedger() {
     try {
       const count = await syncFromCloud()
       if (gen !== syncGenerationRef.current) return
+      resetCloudSyncFailures()
       setState(loadState())
       if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
     } catch (e: unknown) {
       if (gen !== syncGenerationRef.current) return
       const message = e instanceof Error ? e.message : String(e)
-      toast(`云同步失败：${message || "请检查网络"}`)
+      reportCloudSyncFailure(message || "请检查网络")
     } finally {
       if (gen === syncGenerationRef.current) {
         allowPushRef.current = true
         setCloudSynced(true)
-        saveState(loadState(), { push: true })
+        saveState(loadState(), { push: false })
       }
     }
   }, [toast])

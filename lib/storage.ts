@@ -2,7 +2,7 @@ import { createDefaultState, INIT_CATS, STORAGE_KEY } from "./constants"
 import { normalizeCoupleBg } from "./couple-bg"
 import { supabase, useCloud, pullImportBatches, pushImportBatches, validateRoom } from "./supabase"
 import { withRoomLock } from "./sync-lock"
-import { withRetry, withTimeout } from "./sync-utils"
+import { isPostgrestError, withRetry, withTimeout } from "./sync-utils"
 import type { AppState, Goal, Member, Transaction } from "./types"
 import type { PostgrestError } from "@supabase/supabase-js"
 
@@ -239,6 +239,20 @@ export function flushStateSync(state: AppState): void {
   } catch {
     console.warn("localStorage save failed")
   }
+}
+
+/** 房间已不存在，本地缓存已清空 */
+export function clearRoomCache(): void {
+  cancelPendingSync()
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("couple-room-id")
+    localStorage.removeItem(STORAGE_KEY)
+    sessionStorage.removeItem("couple-entered-room")
+  }
+}
+
+export function isRoomDeletedError(e: unknown): boolean {
+  return e instanceof Error && e.message === "ROOM_DELETED"
 }
 
 /** 换房或新建账本：清空本地数据并绑定新房号 */
@@ -533,6 +547,10 @@ export async function syncFromCloud(): Promise<number> {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(local))
       return mergedCount
     } catch (e: unknown) {
+      if (isPostgrestError(e) && e.code === "PGRST116") {
+        clearRoomCache()
+        throw new Error("ROOM_DELETED")
+      }
       const message = e instanceof Error ? e.message : String(e)
       throw new Error(message || "cloud sync failed")
     }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SYS_AVATARS_FEMALE, SYS_AVATARS_MALE, INIT_CATS } from "@/lib/constants"
 import { coupleDaysFrom } from "@/lib/format"
 import { applySaveToGoal } from "@/lib/goals"
-import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures } from "@/lib/storage"
+import { loadState, saveState, syncFromCloud, cancelPendingSync, resetLocalStateForRoom, flushStateSync, flushAndPushState, reportCloudSyncFailure, resetCloudSyncFailures, isRoomDeletedError } from "@/lib/storage"
 import { deleteCloudTransaction, deleteCloudTransactions, pushImportBatches, useCloud } from "@/lib/supabase"
 import { withRoomLock } from "@/lib/sync-lock"
 import {
@@ -233,6 +233,11 @@ export function useLedger() {
       })
       .catch((e: unknown) => {
         if (gen !== syncGenerationRef.current) return
+        if (isRoomDeletedError(e)) {
+          toast("房间已不存在，请重新创建或加入")
+          setTimeout(() => window.location.reload(), 1600)
+          return
+        }
         const message = e instanceof Error ? e.message : String(e)
         reportCloudSyncFailure(message || "请检查网络")
       })

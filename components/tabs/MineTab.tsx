@@ -1,5 +1,6 @@
 import { THEMES } from "@/lib/constants"
 import { coupleBgInlineStyle, hasCoupleBg } from "@/lib/couple-bg"
+import { formatStartDateLabel } from "@/lib/format"
 import type { ThemeKey } from "@/lib/types"
 import type { Ledger } from "@/hooks/useLedger"
 import { useState } from "react"
@@ -13,6 +14,7 @@ export function MineTab({
   ledger: Pick<
     Ledger,
     | "coupleDays"
+    | "startDate"
     | "members"
     | "coupleBg"
     | "coupleBgRef"
@@ -40,6 +42,7 @@ export function MineTab({
 }) {
   const {
     coupleDays,
+    startDate,
     members,
     coupleBg,
     coupleBgRef,
@@ -70,6 +73,9 @@ export function MineTab({
       <header className="topbar">
         <div className="topinfo">
           <div className="sub">第 {coupleDays} 天</div>
+          {startDate ? (
+            <div className="sub mine-start-date">{formatStartDateLabel(startDate)}开始记账</div>
+          ) : null}
           <div className="names">我们的小窝</div>
         </div>
       </header>

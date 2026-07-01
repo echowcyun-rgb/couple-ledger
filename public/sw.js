@@ -1,4 +1,4 @@
-const CACHE_NAME = "couple-ledger-v33"
+const CACHE_NAME = "couple-ledger-v34"
 
 const LOCAL_ASSETS = [
   "./manifest.json",

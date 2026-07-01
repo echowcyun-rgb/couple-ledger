@@ -13,8 +13,18 @@ export function formatFlowDate(dateStr: string): string {
 }
 
 export function coupleDaysFrom(startDate: string): number {
+  if (!startDate) return 1
   const start = new Date(startDate + "T12:00:00")
+  if (Number.isNaN(start.getTime())) return 1
   return Math.max(1, Math.floor((Date.now() - start.getTime()) / 86400000) + 1)
+}
+
+/** 2026-06-28 → 2026年6月28日 */
+export function formatStartDateLabel(startDate: string): string {
+  if (!startDate) return ""
+  const [y, m, d] = startDate.split("-").map(Number)
+  if (!y || !m || !d) return ""
+  return `${y}年${m}月${d}日`
 }
 
 export function shiftDate(dateStr: string, deltaDays: number): string {

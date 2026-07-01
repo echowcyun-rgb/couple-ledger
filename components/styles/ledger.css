@@ -83,6 +83,16 @@
 
 /* 区块标题 */
 .app .section-title { font-size: 13px; margin: 4px 2px 12px; color: var(--ink); }
+.app .section-title.home-overview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.app .home-month-switch { padding: 4px 6px; font-size: 11px; }
+.app .home-month-switch .ms-now { font-size: 11px; min-width: 5.5em; text-align: center; }
+.app .mine-start-date { margin-top: 2px; font-size: 10px; opacity: 0.72; }
 
 /* 卡片 */
 .app .card { background: var(--card); border: 4px solid var(--ink); border-radius: 16px; padding: 14px; margin-bottom: 22px; box-shadow: 6px 6px 0 var(--ink); }

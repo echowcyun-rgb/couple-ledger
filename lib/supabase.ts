@@ -358,9 +358,10 @@ export async function createRoom(): Promise<string> {
   }
   const generateCode = () => String(Math.floor(1000 + Math.random() * 9000))
   const roomId = generateCode()
+  const today = new Date().toISOString().slice(0, 10)
   void supabase
     .from("couples")
-    .insert({ room_id: roomId })
+    .insert({ room_id: roomId, start_date: today })
     .then(({ error }) => {
       if (error) {
         console.warn("[createRoom] background insert failed:", error)
@@ -374,18 +375,24 @@ export async function createRoom(): Promise<string> {
 
 export async function fullPull(roomId: string): Promise<Partial<AppState>> {
   if (!supabase) return {}
-  const [txns, goals, members, batches] = await Promise.all([
+  const [txns, goals, members, batches, coupleRow] = await Promise.all([
     pullTransactions(roomId),
     pullGoals(roomId),
     pullMembers(roomId),
     pullImportBatches(roomId),
+    runSupabase(() =>
+      supabase!.from("couples").select("start_date").eq("room_id", roomId).maybeSingle()
+    ),
   ])
-  return {
+  const partial: Partial<AppState> = {
     transactions: txns,
     goals,
     members: members.length > 0 ? members : undefined,
     importBatches: batches,
   }
+  const startDate = (coupleRow as { start_date?: string } | null)?.start_date
+  if (startDate) partial.startDate = startDate
+  return partial
 }
 
 // ===== 全量推送：把本地状态推送到云端 =====
@@ -398,6 +405,12 @@ export async function fullPush(state: AppState, roomId: string): Promise<boolean
       pushGoals(state.goals, roomId),
       pushMembers(state.members, roomId),
       pushImportBatches(state.importBatches, roomId),
+      runSupabaseVoid(() =>
+        supabase!.from("couples").upsert(
+          { room_id: roomId, start_date: state.startDate || "" },
+          { onConflict: "room_id" }
+        )
+      ),
     ])
     return true
   } catch {

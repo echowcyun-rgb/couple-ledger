@@ -323,7 +323,10 @@ async function pushToCloud(state: AppState): Promise<void> {
   if (!roomId) return
 
   await runSupabaseVoid(() =>
-    supabase!.from("couples").upsert({ room_id: roomId }, { onConflict: "room_id" })
+    supabase!.from("couples").upsert(
+      { room_id: roomId, start_date: state.startDate || "" },
+      { onConflict: "room_id" }
+    )
   )
 
   const CHUNK = 50
@@ -506,10 +509,18 @@ export async function syncFromCloud(): Promise<number> {
       }
 
       const coupleData = await runSupabaseQuery(() =>
-        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y").eq("room_id", roomId).single()
+        supabase!.from("couples").select("couple_bg_url, couple_bg_pos_x, couple_bg_pos_y, start_date").eq("room_id", roomId).single()
       )
       if (coupleData) {
-        const row = coupleData as { couple_bg_url?: string; couple_bg_pos_x?: string; couple_bg_pos_y?: string }
+        const row = coupleData as {
+          couple_bg_url?: string
+          couple_bg_pos_x?: string
+          couple_bg_pos_y?: string
+          start_date?: string
+        }
+        if (row.start_date) {
+          local.startDate = row.start_date
+        }
         if (row.couple_bg_url) {
           local.coupleBg = normalizeCoupleBg({
             url: row.couple_bg_url,

@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS couples (
   created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000),
   couple_bg_url TEXT DEFAULT '',
   couple_bg_pos_x TEXT DEFAULT '50%',
-  couple_bg_pos_y TEXT DEFAULT 'center'
+  couple_bg_pos_y TEXT DEFAULT 'center',
+  start_date TEXT DEFAULT ''
 );
 
 -- 2. 交易记录表（带 room_id）
@@ -84,3 +85,6 @@ ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE goals DISABLE ROW LEVEL SECURITY;
 ALTER TABLE members DISABLE ROW LEVEL SECURITY;
 ALTER TABLE import_batches DISABLE ROW LEVEL SECURITY;
+
+-- 增量迁移（已有库执行，不必删表）
+ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';

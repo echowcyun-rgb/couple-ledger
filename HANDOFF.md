@@ -135,7 +135,7 @@
 - 后台 insert 失败通过 `ledger-cloud-error` 事件 toast 提示
 
 ### startDate 随房间云同步
-- commit: （本轮待推送）
+- commit: `58fb4d4`
 - **`couples.start_date`**：`supabase-migration.sql` 建表 + 增量 `ALTER TABLE`
 - **`createRoom`**：创建时写入当天日期
 - **`fullPull` / `fullPush` / `pushToCloud`**：拉取/推送 `startDate`

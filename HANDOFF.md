@@ -1,6 +1,6 @@
 # Cursor 对话交接 - 情侣记账 PWA
 
-> 更新时间：2026-07-01（第十一轮：导入速度优化 + 云同步修复 + 月份提醒 + 撤回导入指纹清除）
+> 更新时间：2026-07-01（第十二轮：修复云同步覆盖fileFingerprint导致撤回导入后无法重新导入）
 
 ## 项目信息
 - 路径：~/Documents/记账app/-pwav1-移植版
@@ -112,14 +112,16 @@
 - 导入确认后检查交易日期分布，不在当前月份时提示「📅 导入的账单集中在 X年X月，请在流水页切换月份查看」
 
 ### 问题 4：撤回导入后无法重新导入同一文件
-- commit: `2b49cfd`
-- **根因**：撤回时未清除 `localStorage["imported-files"]` 中的文件指纹
-- **修复**：`ImportBatch` 增加 `fileFingerprint` 字段，撤回时清除指纹
+- commit: `2b49cfd` + `257dad5`
+- **根因 1**：撤回时未清除 `localStorage["imported-files"]` 中的文件指纹 → `2b49cfd` 修复
+- **根因 2**：`syncFromCloud` 拉取云端 `import_batches` 时覆盖本地 batch，云端 batch 无 `fileFingerprint` 字段（表里无此列），导致本地指纹丢失 → `257dad5` 修复
+- **修复 1**：`ImportBatch` 增加 `fileFingerprint` 字段，`revertImportBatch` 撤回时清除指纹
+- **修复 2**：`syncFromCloud` 合并 batch 时 `{ ...cb, fileFingerprint: localBatch.fileFingerprint }` 保留本地指纹
 
 ## 部署状态
 - Vercel 项目：**couple-ledger-seven**（echowcyun-3364s-projects）
 - 生产 URL：https://couple-ledger-seven.vercel.app
-- 线上最新部署：commit `2b49cfd`
+- 线上最新部署：commit `257dad5`
 - 部署方式：`git push origin main`（Vercel 自动部署）
 
 ## Supabase 需用户手动执行
@@ -137,11 +139,12 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
 
 ## 最近 commit 记录
 ```
+257dad5 fix: 云同步合并batch时保留本地fileFingerprint
+a6941fe docs: 更新 HANDOFF.md（导入速度+云同步+月份提醒+撤回指纹）
 2b49cfd fix: 导入月份提醒 + 撤回导入后清除文件指纹
 c480bfa fix: 优化手机端导入速度 & 修复导入账单云同步
 929a152 fix: 手机端卡加载中(SW v32) + RoomSetup 进入流程修复 + UI 重构
 58fb4d4 feat: startDate 随房间云同步到 couples.start_date
-3eeeb92 docs: 纳入 Cursor 修复指令文档 cursor-instructions.md
 d3f4303 perf: 云同步收敛 + 图片压缩 + SW v31 + 创建房间优化
 0cc5786 fix: 云推送前 upsert couples 房间并补全建表背景图列
 8da7fbe fix: 头像性别分组修正 + PWA 图片缓存 v30
@@ -151,7 +154,7 @@ d3f4303 perf: 云同步收敛 + 图片压缩 + SW v31 + 创建房间优化
 ## 关键文件清单
 - `lib/constants.ts` — TABS、INIT_CATS（含 finance）、SYS_AVATARS_FEMALE/MALE
 - `lib/types.ts` — Transaction/ImportBatch（含 fileFingerprint）/MonthSummary.financeIncome
-- `lib/storage.ts` — saveState/push 分离、syncFromCloud 合并模式、云同步失败收敛
+- `lib/storage.ts` — saveState/push 分离、syncFromCloud 合并模式（batch 保留 fileFingerprint）、云同步失败收敛
 - `lib/supabase.ts` — createRoom 异步后台 insert、pushTransactions/pullTransactions
 - `lib/importers.ts` — 支付宝/微信/通用 CSV 解析 + 纯文本快速路径（不加载 xlsx）
 - `lib/csv-decode.ts` — UTF-8/GBK 智能解码（仅乱码时才尝试 GBK）

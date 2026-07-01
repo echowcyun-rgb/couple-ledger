@@ -1,7 +1,6 @@
-const CACHE_NAME = "couple-ledger-v31"
+const CACHE_NAME = "couple-ledger-v32"
 
 const LOCAL_ASSETS = [
-  "./",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",
@@ -71,14 +70,23 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
   const url = new URL(event.request.url)
   if (url.origin !== self.location.origin) return
+
+  // HTML 文档始终走网络，避免缓存旧版 shell 与新版 _next 资源不匹配导致 hydration 失败
+  if (
+    event.request.mode === "navigate" ||
+    event.request.destination === "document" ||
+    url.pathname === "/" ||
+    url.pathname === ""
+  ) {
+    event.respondWith(fetch(event.request))
+    return
+  }
+
   if (!shouldCache(url)) return
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached
-      if (url.pathname === "/" || url.pathname === "") {
-        return caches.match("./").then((home) => home || fetch(event.request))
-      }
       return fetch(event.request)
     })
   )

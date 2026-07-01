@@ -15,7 +15,7 @@ function roomSetupErrorMessage(e: unknown, fallback: string): string {
 }
 
 export default function RoomSetup({ onDone }: Props) {
-  const [mode, setMode] = useState<"choose" | "create" | "join">("choose")
+  const [mode, setMode] = useState<"create" | "join">("create")
   const [joinCode, setJoinCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -24,7 +24,7 @@ export default function RoomSetup({ onDone }: Props) {
 
   useEffect(() => {
     const saved = localStorage.getItem("couple-room-id")
-    if (saved) setExistingRoom(saved)
+    setExistingRoom(saved || "")
   }, [])
 
   const handleCreate = async () => {
@@ -39,14 +39,14 @@ export default function RoomSetup({ onDone }: Props) {
             ? "创建失败，云端服务异常，请稍后重试"
             : "创建失败，本地存储不可用，请检查浏览器权限"
         )
-        setMode("choose")
+        setMode("create")
         return
       }
       setCreatedRoom(roomId)
     } catch (e) {
       console.warn("[RoomSetup] 创建账本失败:", e)
       setError(roomSetupErrorMessage(e, "创建失败，网络异常，请检查连接后重试"))
-      setMode("choose")
+      setMode("create")
     } finally {
       setLoading(false)
     }
@@ -85,75 +85,73 @@ export default function RoomSetup({ onDone }: Props) {
 
   return (
     <div className="app">
-      {mode === "choose" && (
-        <main className="room-setup">
-          <header className="room-setup-header">
-            <h1 className="room-setup-title">俩人账本</h1>
-            <p className="room-setup-subtitle">创建或加入账本，和TA一起记账</p>
-          </header>
+      <main className="room-setup">
+        <header className="room-setup-header">
+          <h1 className="room-setup-title">俩人账本</h1>
+          <p className="room-setup-subtitle">创建或加入账本，和TA一起记账</p>
+        </header>
 
-          <div className="room-setup-couple">
-            <div className="room-setup-av">
-              <div className="room-setup-av-box">
-                <img src="/avatars/girl.jpg" alt="女生角色" />
-              </div>
-              <span className="room-setup-av-label">我</span>
+        <div className="room-setup-couple">
+          <div className="room-setup-av">
+            <div className="room-setup-av-box">
+              <img src="/avatars/girl.jpg" alt="女生角色" />
             </div>
-            <PixelHeart />
-            <div className="room-setup-av">
-              <div className="room-setup-av-box">
-                <img src="/avatars/boy.jpg" alt="男生角色" />
-              </div>
-              <span className="room-setup-av-label">Ta</span>
-            </div>
+            <span className="room-setup-av-label">我</span>
           </div>
+          <PixelHeart />
+          <div className="room-setup-av">
+            <div className="room-setup-av-box">
+              <img src="/avatars/boy.jpg" alt="男生角色" />
+            </div>
+            <span className="room-setup-av-label">Ta</span>
+          </div>
+        </div>
 
-          <div className="room-setup-actions">
-            {existingRoom && (
-              <button
-                type="button"
-                className="room-setup-btn rose"
-                onClick={() => onDone(existingRoom, false)}
-              >
-                <span className="room-setup-ico">
-                  <PixelEnter />
-                </span>
-                <span className="room-setup-btn-text">
-                  <strong>进入账本 #{existingRoom}</strong>
-                  <small>点击继续使用上次账本</small>
-                </span>
-                <PixelArrow />
-              </button>
-            )}
+        <div className="room-setup-actions">
+          <button className="room-setup-btn green" onClick={handleCreate} disabled={loading} type="button">
+            <span className="room-setup-ico">
+              <PixelPlus />
+            </span>
+            <span className="room-setup-btn-text">
+              <strong>创建账本</strong>
+              <small>新建共享账本，获取邀请码</small>
+            </span>
+            <PixelArrow />
+          </button>
 
-            <button className="room-setup-btn green" onClick={handleCreate} disabled={loading} type="button">
+          {existingRoom && (
+            <button
+              type="button"
+              className="room-setup-btn rose"
+              onClick={() => onDone(existingRoom, false)}
+            >
               <span className="room-setup-ico">
-                <PixelPlus />
+                <PixelEnter />
               </span>
               <span className="room-setup-btn-text">
-                <strong>创建账本</strong>
-                <small>新建共享账本，获取邀请码</small>
+                <strong>进入 #{existingRoom} 房间</strong>
+                <small>直接进入上次使用的房间</small>
               </span>
               <PixelArrow />
             </button>
+          )}
 
-            <button className="room-setup-btn amber" onClick={() => setMode("join")} disabled={loading} type="button">
-              <span className="room-setup-ico">
-                <PixelKey />
-              </span>
-              <span className="room-setup-btn-text">
-                <strong>加入账本</strong>
-                <small>输入邀请码，加入伴侣账本</small>
-              </span>
-              <PixelArrow />
-            </button>
-          </div>
+          <button className="room-setup-btn amber" onClick={() => setMode("join")} disabled={loading} type="button">
+            <span className="room-setup-ico">
+              <PixelKey />
+            </span>
+            <span className="room-setup-btn-text">
+              <strong>加入账本</strong>
+              <small>输入邀请码，加入伴侣账本</small>
+            </span>
+            <PixelArrow />
+          </button>
+        </div>
 
-          {error && <p className="room-setup-error">{error}</p>}
+        {error && <p className="room-setup-error">{error}</p>}
 
-          <p className="room-setup-footer">START YOUR JOURNEY</p>
-        </main>
-      )}
+        <p className="room-setup-footer">START YOUR JOURNEY</p>
+      </main>
 
       {mode === "create" &&
         (createdRoom ? (
@@ -161,7 +159,7 @@ export default function RoomSetup({ onDone }: Props) {
             <div className="room-setup-modal-panel">
               <div className="room-setup-modal-head green">
                 <span>创建成功！</span>
-                <button onClick={() => setMode("choose")} type="button" aria-label="关闭">
+                <button onClick={() => setCreatedRoom("")} type="button" aria-label="关闭">
                   ×
                 </button>
               </div>
@@ -177,17 +175,17 @@ export default function RoomSetup({ onDone }: Props) {
               </div>
             </div>
           </div>
-        ) : (
+        ) : loading ? (
           <div className="room-setup-loading">正在创建...</div>
-        ))}
+        ) : null)}
 
       {mode === "join" && (
         <div className="room-setup-modal">
-          <div className="room-setup-modal-mask" onClick={() => { setMode("choose"); setError(""); setJoinCode("") }} />
+          <div className="room-setup-modal-mask" onClick={() => { setMode("create"); setError(""); setJoinCode("") }} />
           <div className="room-setup-modal-panel">
             <div className="room-setup-modal-head amber">
               <span>加入账本</span>
-              <button onClick={() => { setMode("choose"); setError(""); setJoinCode("") }} type="button" aria-label="关闭">
+              <button onClick={() => { setMode("create"); setError(""); setJoinCode("") }} type="button" aria-label="关闭">
                 ×
               </button>
             </div>
@@ -210,7 +208,7 @@ export default function RoomSetup({ onDone }: Props) {
               <button className="px-btn solid" onClick={handleJoin} disabled={loading || joinCode.trim().length < 4} type="button">
                 {loading ? "验证中..." : "加入共享账本"}
               </button>
-              <button className="px-btn ghost" onClick={() => { setMode("choose"); setError(""); setJoinCode("") }} type="button">
+              <button className="px-btn ghost" onClick={() => { setMode("create"); setError(""); setJoinCode("") }} type="button">
                 取消
               </button>
             </div>

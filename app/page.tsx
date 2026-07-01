@@ -25,13 +25,11 @@ function paydayAlertStorageKey() {
   return `payday-alerted-${new Date().toDateString()}`
 }
 
-function hasSavedRoom() {
-  return typeof window !== "undefined" && !!localStorage.getItem("couple-room-id")
-}
-
 export default function Page() {
   const ledger = useLedger()
-  const [showSetup, setShowSetup] = useState(() => !hasSavedRoom())
+  /** SSR 时读不到 localStorage，必须在客户端 hydration 后再决定是否显示 RoomSetup */
+  const [setupReady, setSetupReady] = useState(false)
+  const [showSetup, setShowSetup] = useState(false)
   const [showPaydayAlert, setShowPaydayAlert] = useState(false)
 
   const dismissPaydayAlert = () => {
@@ -40,9 +38,10 @@ export default function Page() {
   }
 
   useEffect(() => {
-    if (ledger.hydrated && !hasSavedRoom()) {
-      setShowSetup(true)
-    }
+    if (!ledger.hydrated) return
+    // 每次进入都显示 RoomSetup：新用户创建/加入，老用户点「进入 #xxxx 房间」进首页
+    setShowSetup(true)
+    setSetupReady(true)
   }, [ledger.hydrated])
 
   useEffect(() => {
@@ -54,7 +53,7 @@ export default function Page() {
     }
   }, [ledger.hydrated, ledger.members])
 
-  if (!ledger.hydrated) {
+  if (!ledger.hydrated || !setupReady) {
     return (
       <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <span style={{ fontFamily: "var(--font-pixel-cjk), monospace", fontSize: 12 }}>加载中...</span>

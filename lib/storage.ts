@@ -64,6 +64,7 @@ function migrateGoal(g: StoredGoal): Goal {
       memberId: h.memberId,
     })),
     deadline: g.deadline || "",
+    completedAt: g.completedAt || undefined,
   }
 }
 

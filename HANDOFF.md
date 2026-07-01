@@ -1,6 +1,6 @@
 # Cursor 对话交接 - 情侣记账 PWA
 
-> 更新时间：2026-07-01（第十三轮：彻底修复撤回导入后无法重新导入同一文件）
+> 更新时间：2026-07-01（第十四轮：文件指纹管理重构 + 表结构验证 + goals.completedAt 补齐）
 
 ## 项目信息
 - 路径：~/Documents/记账app/-pwav1-移植版
@@ -127,16 +127,37 @@
 ## 部署状态
 - Vercel 项目：**couple-ledger-seven**（echowcyun-3364s-projects）
 - 生产 URL：https://couple-ledger-seven.vercel.app
-- 线上最新部署：commit `257dad5`（`ddb3d9b` 待合并部署）
+- 线上最新部署：commit `ddb3d9b`（文件指纹重构 + goals.completedAt 补齐）
 - 部署方式：`git push origin main`（Vercel 自动部署）
 
-## Supabase 需用户手动执行
+## Supabase 已执行 SQL（表结构修复）
+用户已在 Supabase SQL Editor 执行以下修复（验证通过 ✅）：
 ```sql
+-- couples 背景图与起始日期
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_url TEXT DEFAULT '';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_x TEXT DEFAULT '50%';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS couple_bg_pos_y TEXT DEFAULT 'center';
 ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
+
+-- goals completedAt 列
+ALTER TABLE goals ADD COLUMN IF NOT EXISTS "completedAt" TEXT DEFAULT NULL;
+
+-- import_batches status 列
+ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+
+-- 唯一约束（upsert onConflict 依赖）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_members_room_id ON members(room_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_goals_room_id ON goals(room_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_import_batches_room_time ON import_batches(room_id, time);
+
+-- RLS 全部关闭
+ALTER TABLE couples DISABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE goals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE import_batches DISABLE ROW LEVEL SECURITY;
 ```
+验证结果：5 张表列结构完全匹配代码，3 个唯一索引已建，RLS 全部关闭 ✅
 
 ## 测试要求
 - ✅ `npm run build` + `npm test`（37 passed）
@@ -146,6 +167,7 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
 ## 最近 commit 记录
 ```
 ddb3d9b fix: 撤回导入后允许重新导入同一账单文件
+e46e980 docs: 更新 HANDOFF.md（第十三轮撤回重导修复）
 082d692 docs: 更新 HANDOFF.md（云同步保留fileFingerprint修复）
 257dad5 fix: 云同步合并batch时保留本地fileFingerprint
 a6941fe docs: 更新 HANDOFF.md（导入速度+云同步+月份提醒+撤回指纹）

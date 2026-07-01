@@ -37,7 +37,6 @@ export function ImportPreviewSheet({
   const [rows, setRows] = useState<PreviewRow[]>([])
   const [skipDuplicate, setSkipDuplicate] = useState(true)
   const [confirmUncategorized, setConfirmUncategorized] = useState(false)
-  const swipe = useSheetSwipe(onCancel, open)
 
   useEffect(() => {
     if (open) {
@@ -100,8 +99,6 @@ export function ImportPreviewSheet({
         className={`sheet import-preview-sheet ${open ? "show" : ""}`}
         role="dialog"
         aria-label="导入预览"
-        onTouchStart={swipe.onTouchStart}
-        onTouchEnd={swipe.onTouchEnd}
       >
         <div className="sheet-grab" aria-hidden="true" />
         <div className="import-preview-header">

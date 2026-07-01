@@ -35,8 +35,6 @@ export const CATEGORY_KEYWORD_RULES: CategoryKeywordRule[] = [
   { keyword: "航空", categoryKey: "car", priority: 100 },
   { keyword: "地铁", categoryKey: "car", priority: 90 },
   { keyword: "公交", categoryKey: "car", priority: 90 },
-  { keyword: "加油", categoryKey: "car", priority: 90 },
-  { keyword: "停车", categoryKey: "car", priority: 90 },
   { keyword: "交通", categoryKey: "car", priority: 80 },
 
   // 购物
@@ -74,6 +72,38 @@ export const CATEGORY_KEYWORD_RULES: CategoryKeywordRule[] = [
   { keyword: "挂号", categoryKey: "med", priority: 100 },
   { keyword: "门诊", categoryKey: "med", priority: 100 },
   { keyword: "医疗", categoryKey: "med", priority: 90 },
+
+  // 宠物
+  { keyword: "宠物", categoryKey: "pet", priority: 100 },
+  { keyword: "猫粮", categoryKey: "pet", priority: 95 },
+  { keyword: "狗粮", categoryKey: "pet", priority: 95 },
+  { keyword: "兽医", categoryKey: "pet", priority: 95 },
+
+  // 医美 / 美容
+  { keyword: "医美", categoryKey: "beauty", priority: 100 },
+  { keyword: "美容", categoryKey: "beauty", priority: 95 },
+  { keyword: "护肤", categoryKey: "beauty", priority: 90 },
+  { keyword: "整形", categoryKey: "beauty", priority: 90 },
+
+  // 化妆品
+  { keyword: "化妆品", categoryKey: "cosmetics", priority: 100 },
+  { keyword: "口红", categoryKey: "cosmetics", priority: 95 },
+  { keyword: "彩妆", categoryKey: "cosmetics", priority: 95 },
+  { keyword: "粉底", categoryKey: "cosmetics", priority: 90 },
+
+  // 人情
+  { keyword: "礼金", categoryKey: "social", priority: 100 },
+  { keyword: "人情", categoryKey: "social", priority: 100 },
+  { keyword: "份子", categoryKey: "social", priority: 95 },
+  { keyword: "随礼", categoryKey: "social", priority: 95 },
+
+  // 汽车（vehicle；公交/地铁等仍用 car）
+  { keyword: "加油", categoryKey: "vehicle", priority: 100 },
+  { keyword: "停车", categoryKey: "vehicle", priority: 100 },
+  { keyword: "洗车", categoryKey: "vehicle", priority: 95 },
+  { keyword: "保养", categoryKey: "vehicle", priority: 90 },
+  { keyword: "汽修", categoryKey: "vehicle", priority: 95 },
+  { keyword: "车险", categoryKey: "vehicle", priority: 95 },
 
   // 工资
   { keyword: "工资", categoryKey: "salary", priority: 100 },

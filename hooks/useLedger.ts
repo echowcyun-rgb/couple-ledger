@@ -48,6 +48,57 @@ import type {
   TxType,
 } from "@/lib/types"
 
+const IMPORTED_FILES_KEY = "imported-files"
+
+/** 以活跃导入批次的 fileFingerprint 为准，同步 localStorage 去重列表 */
+function syncImportedFilesFromBatches(batches: ImportBatch[]): void {
+  if (typeof window === "undefined") return
+  try {
+    const fps = batches
+      .filter((b) => b.status !== "reverted" && b.fileFingerprint)
+      .map((b) => b.fileFingerprint as string)
+    localStorage.setItem(IMPORTED_FILES_KEY, JSON.stringify(fps.slice(-50)))
+  } catch {
+    // ignore
+  }
+}
+
+/** 云同步后合并 importBatches，保留内存中的 fileFingerprint 及尚未落盘的新批次 */
+function mergeImportBatchesAfterSync(
+  fromStorage: ImportBatch[],
+  fromPrev: ImportBatch[]
+): ImportBatch[] {
+  const storageTimes = new Set(fromStorage.map((b) => b.time))
+  const prevFpByTime = new Map(
+    fromPrev.filter((b) => b.fileFingerprint).map((b) => [b.time, b.fileFingerprint!])
+  )
+
+  const merged = fromStorage.map((b) => {
+    const fp = prevFpByTime.get(b.time) ?? b.fileFingerprint
+    return fp ? { ...b, fileFingerprint: fp } : b
+  })
+
+  for (const b of fromPrev) {
+    if (!storageTimes.has(b.time)) merged.push(b)
+  }
+
+  return merged.sort((a, b) => b.time.localeCompare(a.time))
+}
+
+function mergeStateAfterCloudSync(prev: AppState, merged: AppState): AppState {
+  const localUnsynced = prev.transactions.filter((t) => !t.synced)
+  const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
+  for (const t of localUnsynced) {
+    if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
+  }
+
+  return {
+    ...merged,
+    transactions: Array.from(mergedMap.values()).sort((a, b) => b.createdAt - a.createdAt),
+    importBatches: mergeImportBatchesAfterSync(merged.importBatches, prev.importBatches),
+  }
+}
+
 function generateCelebrateMessages(amount: number, current: number, target: number): string {
   const isComplete = current >= target
 
@@ -230,20 +281,7 @@ export function useLedger() {
         if (gen !== syncGenerationRef.current) return
         resetCloudSyncFailures()
         // 合并云端数据但保留本地未同步的修改（如刚导入但尚未推送的交易）
-        setState((prev) => {
-          const merged = loadState()
-          const localUnsynced = prev.transactions.filter((t) => !t.synced)
-          const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
-          for (const t of localUnsynced) {
-            if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
-          }
-          return {
-            ...merged,
-            transactions: Array.from(mergedMap.values()).sort(
-              (a, b) => b.createdAt - a.createdAt
-            ),
-          }
-        })
+        setState((prev) => mergeStateAfterCloudSync(prev, loadState()))
         if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
       })
       .catch((e: unknown) => {
@@ -286,21 +324,7 @@ export function useLedger() {
           if (cancelled || gen !== syncGenerationRef.current) return
           resetCloudSyncFailures()
           // 合并云端数据但不覆盖本地未同步的修改
-          setState((prev) => {
-            const merged = loadState()
-            // 保留本地未同步的交易（synced != true 的）
-            const localUnsynced = prev.transactions.filter((t) => !t.synced)
-            const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
-            for (const t of localUnsynced) {
-              if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
-            }
-            return {
-              ...merged,
-              transactions: Array.from(mergedMap.values()).sort(
-                (a, b) => b.createdAt - a.createdAt
-              ),
-            }
-          })
+          setState((prev) => mergeStateAfterCloudSync(prev, loadState()))
           if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
         })
         .catch((e: unknown) => {
@@ -359,20 +383,7 @@ export function useLedger() {
       if (gen !== syncGenerationRef.current) return
       resetCloudSyncFailures()
       // 合并云端数据但保留本地未同步的修改
-      setState((prev) => {
-        const merged = loadState()
-        const localUnsynced = prev.transactions.filter((t) => !t.synced)
-        const mergedMap = new Map(merged.transactions.map((t) => [t.id, t]))
-        for (const t of localUnsynced) {
-          if (!mergedMap.has(t.id)) mergedMap.set(t.id, t)
-        }
-        return {
-          ...merged,
-          transactions: Array.from(mergedMap.values()).sort(
-            (a, b) => b.createdAt - a.createdAt
-          ),
-        }
-      })
+      setState((prev) => mergeStateAfterCloudSync(prev, loadState()))
       if (count > 0) toast(`☁️ 已同步 ${count} 条云端记录`)
     } catch (e: unknown) {
       if (gen !== syncGenerationRef.current) return
@@ -992,24 +1003,24 @@ export function useLedger() {
       status: "active",
       fileFingerprint: importPreviewFileFingerprint || undefined,
     }
-    setState((s) => ({
-      ...s,
-      transactions: [...imported, ...s.transactions],
-      importBatches: [batch, ...s.importBatches],
-    }))
+    setState((s) => {
+      const next = {
+        ...s,
+        transactions: [...imported, ...s.transactions],
+        importBatches: [batch, ...s.importBatches],
+      }
+      flushStateSync(next)
+      if (importPreviewFileFingerprint) {
+        syncImportedFilesFromBatches(next.importBatches)
+      }
+      return next
+    })
     const sourceLabel =
       importPreviewSource === "alipay"
         ? "支付宝"
         : importPreviewSource === "wechat"
           ? "微信"
           : "通用"
-
-    if (importPreviewFileFingerprint) {
-      const importedFingerprints = JSON.parse(localStorage.getItem("imported-files") || "[]") as string[]
-      importedFingerprints.push(importPreviewFileFingerprint)
-      if (importedFingerprints.length > 50) importedFingerprints.shift()
-      localStorage.setItem("imported-files", JSON.stringify(importedFingerprints))
-    }
 
     toast(`✅ 已导入 ${imported.length} 条${sourceLabel}账单`)
 
@@ -1076,24 +1087,19 @@ export function useLedger() {
     const deleteCount = batch.ids.length
     const updatedBatch: ImportBatch = { ...batch, status: "reverted" }
 
-    // 清除文件指纹，允许用户重新导入同一文件
-    if (batch.fileFingerprint) {
-      try {
-        const importedFingerprints = JSON.parse(localStorage.getItem("imported-files") || "[]") as string[]
-        const filtered = importedFingerprints.filter((fp) => fp !== batch.fileFingerprint)
-        localStorage.setItem("imported-files", JSON.stringify(filtered))
-      } catch {
-        // 忽略 localStorage 读取错误
-      }
-    }
-
-    setState((s) => ({
-      ...s,
-      transactions: s.transactions.filter((tx) => !idsSet.has(tx.id)),
-      importBatches: s.importBatches.map((b) =>
+    setState((s) => {
+      const nextBatches = s.importBatches.map((b) =>
         b.time === batchTime ? updatedBatch : b
-      ),
-    }))
+      )
+      const next = {
+        ...s,
+        transactions: s.transactions.filter((tx) => !idsSet.has(tx.id)),
+        importBatches: nextBatches,
+      }
+      syncImportedFilesFromBatches(nextBatches)
+      flushStateSync(next)
+      return next
+    })
 
     const roomId =
       state.roomId ||
@@ -1132,8 +1138,10 @@ export function useLedger() {
     if (!file) return
 
     const fileFingerprint = `${file.name}|${file.size}|${file.lastModified}`
-    const importedFingerprints = JSON.parse(localStorage.getItem("imported-files") || "[]") as string[]
-    if (importedFingerprints.includes(fileFingerprint)) {
+    const hasActiveDuplicate = importBatches.some(
+      (b) => b.status !== "reverted" && b.fileFingerprint === fileFingerprint
+    )
+    if (hasActiveDuplicate) {
       toast("⚠️ 请勿导入重复账单！")
       e.target.value = ""
       return
@@ -1203,7 +1211,7 @@ export function useLedger() {
       e.target.value = ""
       toast("仅支持 .csv / .xlsx / .xls 格式")
     }
-  }, [members, cats, openImportPreview, toast])
+  }, [members, cats, importBatches, openImportPreview, toast])
 
   const prevReviewMonth = useCallback(() => {
     if (transactions.length === 0) {

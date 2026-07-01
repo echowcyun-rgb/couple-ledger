@@ -176,7 +176,7 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
 ## 部署状态
 - Vercel 项目：**couple-ledger-seven**（echowcyun-3364s-projects）
 - 生产 URL：https://couple-ledger-seven.vercel.app
-- 线上最新部署：手机端卡加载中 + RoomSetup 进入流程修复 + SW v32（本次推送后部署）
+- 线上最新部署：commit `929a152`（手机端卡加载中 + RoomSetup 进入流程修复 + SW v32），状态 READY
 - 部署方式：`git push origin main`（见 `Vercel部署指令.md`）
 
 ## 新发现待修复问题（已全部修复 ✅）
@@ -207,7 +207,7 @@ ALTER TABLE couples ADD COLUMN IF NOT EXISTS start_date TEXT DEFAULT '';
 
 ## 最近 commit 记录
 ```
-（本次）fix: 手机端卡加载中(SW v32) + RoomSetup 进入流程修复 + UI 重构
+929a152 fix: 手机端卡加载中(SW v32) + RoomSetup 进入流程修复 + UI 重构
 58fb4d4 feat: startDate 随房间云同步到 couples.start_date
 3eeeb92 docs: 纳入 Cursor 修复指令文档 cursor-instructions.md
 d3f4303 perf: 云同步收敛 + 图片压缩 + SW v31 + 创建房间优化

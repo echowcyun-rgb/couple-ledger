@@ -16,7 +16,11 @@ export function coupleDaysFrom(startDate: string): number {
   if (!startDate) return 1
   const start = new Date(startDate + "T12:00:00")
   if (Number.isNaN(start.getTime())) return 1
-  return Math.max(1, Math.floor((Date.now() - start.getTime()) / 86400000) + 1)
+  const now = new Date()
+  const today = new Date(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T12:00:00`
+  )
+  return Math.max(1, Math.floor((today.getTime() - start.getTime()) / 86400000) + 1)
 }
 
 /** 2026-06-28 → 2026年6月28日 */

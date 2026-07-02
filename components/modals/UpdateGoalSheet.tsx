@@ -45,6 +45,7 @@ export function UpdateGoalSheet({
   } = ledger
 
   const financeIncomeThisMonth = monthSummary?.financeIncome ?? 0
+  const savingsThisMonth = monthSummary?.savings ?? 0
 
   const [saving, setSaving] = useState(false)
   const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null)
@@ -119,6 +120,14 @@ export function UpdateGoalSheet({
                 {updateMode === "amount" && updateAmount && !Number.isNaN(Number(updateAmount)) && Number(updateAmount) > 0 && (
                   <div className="upd-field-hint">
                     更新后将达到 ¥{updateGoal.current + Number(updateAmount)}
+                  </div>
+                )}
+                {updateMode === "pct" && (
+                  <div className="upd-field-hint">
+                    当月已存 ¥{savingsThisMonth}
+                    {updateAmount && !Number.isNaN(Number(updateAmount)) && Number(updateAmount) > 0 && savingsThisMonth > 0 && (
+                      <> · 本次存入 ¥{Math.round(savingsThisMonth * (Number(updateAmount) / 100))} · 更新后将达到 ¥{updateGoal.current + Math.round(savingsThisMonth * (Number(updateAmount) / 100))}</>
+                    )}
                   </div>
                 )}
               </>

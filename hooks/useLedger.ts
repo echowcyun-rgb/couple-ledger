@@ -781,10 +781,11 @@ export function useLedger() {
 
     if (updateMode === "pct") {
       const num = Number(updateAmount)
-      if (!num || num < 0) { toast("请输入有效金额"); return }
-      newCurrent = Math.round(updateGoal.target * (num / 100))
-      historyAmount = newCurrent
-      historyNote = updateNote || "手动更新"
+      if (!num || num < 0) { toast("请输入有效百分比"); return }
+      if (monthSummary.savings <= 0) { toast("你还没有存钱哦！"); return }
+      historyAmount = Math.round(monthSummary.savings * (num / 100))
+      newCurrent = updateGoal.current + historyAmount
+      historyNote = updateNote || `当月存款 ${num}%`
     } else if (updateMode === "finance") {
       const financeAmount = monthSummary.financeIncome
       if (financeAmount <= 0) { toast("当月暂无理财收入"); return }
@@ -818,7 +819,7 @@ export function useLedger() {
     const msgs = generateCelebrateMessages(historyAmount, newCurrent, updateGoal.target)
     setCelebrateMsg(msgs)
     setCelebrateOpen(true)
-  }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, updateMemberId, monthSummary.financeIncome, toast])
+  }, [updateGoal, updateGoalId, updateAmount, updateMode, updateNote, updateMemberId, monthSummary.financeIncome, monthSummary.savings, toast])
 
   const editGoalHistory = useCallback((goalId: number, historyId: string, patchHist: Partial<Pick<GoalHistoryEntry, "amount" | "note">>) => {
     setState((s) => ({

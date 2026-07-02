@@ -93,12 +93,20 @@ function mergeStateAfterCloudSync(prev: AppState, merged: AppState): AppState {
     mergedMap.set(t.id, t)
   }
 
+  const mergedGoalMap = new Map(merged.goals.map((g) => [g.id, g]))
+  for (const g of prev.goals) {
+    if (!mergedGoalMap.has(g.id)) {
+      mergedGoalMap.set(g.id, g)
+    }
+  }
+
   const importBatches = mergeImportBatchesAfterSync(merged.importBatches, prev.importBatches)
   syncImportedFilesFromBatches(importBatches)
 
   return {
     ...merged,
     transactions: Array.from(mergedMap.values()).sort((a, b) => b.createdAt - a.createdAt),
+    goals: Array.from(mergedGoalMap.values()),
     importBatches,
     cats: mergeCatsUnion([merged.cats, prev.cats]),
     theme: prev.theme,
@@ -702,11 +710,15 @@ export function useLedger() {
       history: [],
       deadline: newGoalDeadline,
     }
-    setState((s) => ({
-      ...s,
-      goals: [...s.goals, goal],
-      activeGoalId: s.activeGoalId ?? id,
-    }))
+    setState((s) => {
+      const next = {
+        ...s,
+        goals: [...s.goals, goal],
+        activeGoalId: s.activeGoalId ?? id,
+      }
+      flushStateSync(next)
+      return next
+    })
     setNewGoalName("")
     setNewGoalTarget("")
     setNewGoalDeadline("")
